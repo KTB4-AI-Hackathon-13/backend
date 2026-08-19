@@ -18,6 +18,10 @@ spring:
   jackson:
     # OffsetDateTime 직렬화 기준 시간대 (응답 일시 +09:00)
     time-zone: Asia/Seoul
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 11MB
 
 app:
   cors:
@@ -26,3 +30,10 @@ app:
   auth:
     # true 면 세션 쿠키가 없을 때 X-User-Id 헤더로 사용자를 식별 (로컬 Postman 테스트용). 운영에서는 반드시 false
     dev-header-enabled: ${APP_AUTH_DEV_HEADER_ENABLED:false}
+  storage:
+    bucket: ${S3_BUCKET:}
+    region: ${AWS_REGION:ap-northeast-2}
+    endpoint: ${S3_ENDPOINT:}
+    access-key: ${AWS_ACCESS_KEY_ID:}
+    secret-key: ${AWS_SECRET_ACCESS_KEY:}
+    presigned-url-minutes: ${S3_PRESIGNED_URL_MINUTES:10}
