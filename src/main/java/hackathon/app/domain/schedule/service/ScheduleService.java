@@ -15,8 +15,8 @@ import hackathon.app.domain.scheduleitem.repository.PuzzleCountProjection;
 import hackathon.app.domain.scheduleitem.repository.ScheduleItemRepository;
 import hackathon.app.global.common.CursorCodec;
 import hackathon.app.global.common.CursorPage;
-import hackathon.app.global.error.BusinessException;
-import hackathon.app.global.error.ErrorCode;
+import hackathon.app.common.error.ApiException;
+import hackathon.app.common.error.ErrorCode;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -88,21 +88,21 @@ public class ScheduleService {
     @Transactional
     public ScheduleSummaryResponse updateSchedule(Long userId, Long scheduleId, ScheduleUpdateRequest request) {
         if (request.isEmpty()) {
-            throw new BusinessException(ErrorCode.INVALID_REQUEST, "변경할 필드가 최소 하나 필요합니다.");
+            throw new ApiException(ErrorCode.INVALID_REQUEST, "변경할 필드가 최소 하나 필요합니다.");
         }
         Schedule schedule = getOwnedSchedule(userId, scheduleId);
 
         LocalDate newStart = request.startDate() != null ? request.startDate() : schedule.getStartDate();
         LocalDate newEnd = request.endDate() != null ? request.endDate() : schedule.getEndDate();
         if (newStart.isAfter(newEnd)) {
-            throw new BusinessException(ErrorCode.INVALID_SCHEDULE_PERIOD);
+            throw new ApiException(ErrorCode.INVALID_SCHEDULE_PERIOD);
         }
         boolean periodChanged = !newStart.equals(schedule.getStartDate()) || !newEnd.equals(schedule.getEndDate());
         if (periodChanged) {
             long outside = scheduleItemRepository.countOutsidePeriod(
                     scheduleId, newStart, newEnd, ScheduleItemStatus.CANCELLED);
             if (outside > 0) {
-                throw new BusinessException(ErrorCode.ITEMS_OUTSIDE_SCHEDULE_PERIOD,
+                throw new ApiException(ErrorCode.ITEMS_OUTSIDE_SCHEDULE_PERIOD,
                         "변경하려는 기간 밖에 작업이 " + outside + "건 존재합니다.");
             }
         }
@@ -145,9 +145,9 @@ public class ScheduleService {
      */
     public Schedule getOwnedSchedule(Long userId, Long scheduleId) {
         Schedule schedule = scheduleRepository.findById(scheduleId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.SCHEDULE_NOT_FOUND));
+                .orElseThrow(() -> new ApiException(ErrorCode.SCHEDULE_NOT_FOUND));
         if (!schedule.isOwnedBy(userId)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN);
+            throw new ApiException(ErrorCode.FORBIDDEN);
         }
         return schedule;
     }

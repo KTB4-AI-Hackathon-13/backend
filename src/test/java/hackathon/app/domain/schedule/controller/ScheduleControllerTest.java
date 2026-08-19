@@ -20,9 +20,9 @@ import hackathon.app.global.auth.LoginUserArgumentResolver;
 import hackathon.app.global.common.CursorPage;
 import hackathon.app.global.common.RequestIdFilter;
 import hackathon.app.global.config.WebConfig;
-import hackathon.app.global.error.BusinessException;
-import hackathon.app.global.error.ErrorCode;
-import hackathon.app.global.error.GlobalExceptionHandler;
+import hackathon.app.common.error.ApiException;
+import hackathon.app.common.error.ErrorCode;
+import hackathon.app.common.error.GlobalExceptionHandler;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -70,11 +70,11 @@ class ScheduleControllerTest {
     }
 
     @Test
-    @DisplayName("GET /schedules — X-User-Id 없으면 401 UNAUTHORIZED")
+    @DisplayName("GET /schedules — X-User-Id 없으면 401 AUTHENTICATION_REQUIRED")
     void getSchedules_withoutUser_returns401() throws Exception {
         mockMvc.perform(get(BASE))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"))
                 .andExpect(jsonPath("$.requestId").isNotEmpty());
     }
 
@@ -90,7 +90,7 @@ class ScheduleControllerTest {
     @Test
     @DisplayName("GET /schedules/{id} — 없으면 404 SCHEDULE_NOT_FOUND")
     void getSchedule_notFound_returns404() throws Exception {
-        when(scheduleService.getSchedule(1L, 999L)).thenThrow(new BusinessException(ErrorCode.SCHEDULE_NOT_FOUND));
+        when(scheduleService.getSchedule(1L, 999L)).thenThrow(new ApiException(ErrorCode.SCHEDULE_NOT_FOUND));
 
         mockMvc.perform(get(BASE + "/999").header("X-User-Id", "1"))
                 .andExpect(status().isNotFound())
@@ -101,7 +101,7 @@ class ScheduleControllerTest {
     @Test
     @DisplayName("GET /schedules/{id} — 타인 소유면 403 FORBIDDEN")
     void getSchedule_forbidden_returns403() throws Exception {
-        when(scheduleService.getSchedule(1L, 201L)).thenThrow(new BusinessException(ErrorCode.FORBIDDEN));
+        when(scheduleService.getSchedule(1L, 201L)).thenThrow(new ApiException(ErrorCode.FORBIDDEN));
 
         mockMvc.perform(get(BASE + "/201").header("X-User-Id", "1"))
                 .andExpect(status().isForbidden())
@@ -124,7 +124,7 @@ class ScheduleControllerTest {
     @DisplayName("PATCH /schedules/{id} — 기간 밖 작업 존재 시 409 ITEMS_OUTSIDE_SCHEDULE_PERIOD")
     void updateSchedule_conflict_returns409() throws Exception {
         when(scheduleService.updateSchedule(eq(1L), eq(101L), any()))
-                .thenThrow(new BusinessException(ErrorCode.ITEMS_OUTSIDE_SCHEDULE_PERIOD));
+                .thenThrow(new ApiException(ErrorCode.ITEMS_OUTSIDE_SCHEDULE_PERIOD));
 
         mockMvc.perform(patch(BASE + "/101").header("X-User-Id", "1")
                         .contentType(MediaType.APPLICATION_JSON).content("{\"endDate\":\"2026-08-20\"}"))
@@ -153,7 +153,7 @@ class ScheduleControllerTest {
     @Test
     @DisplayName("DELETE /schedules/{id} — 없으면 404")
     void deleteSchedule_notFound_returns404() throws Exception {
-        doThrow(new BusinessException(ErrorCode.SCHEDULE_NOT_FOUND)).when(scheduleService).deleteSchedule(1L, 999L);
+        doThrow(new ApiException(ErrorCode.SCHEDULE_NOT_FOUND)).when(scheduleService).deleteSchedule(1L, 999L);
 
         mockMvc.perform(delete(BASE + "/999").header("X-User-Id", "1"))
                 .andExpect(status().isNotFound())

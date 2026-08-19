@@ -3,13 +3,22 @@
 ## 1. 사전 준비
 
 ```bash
-# (1) MySQL 기동 확인 (docker: ai-hackathon-mysql, 127.0.0.1:3307)
+# (1) MySQL 기동 확인 (docker: ai-hackathon-mysql, 127.0.0.1:3307) + position 컬럼 (ERD SQL 로 만든 DB 면 한 번만)
 docker ps | grep ai-hackathon-mysql
+mysql -h 127.0.0.1 -P 3307 -uhackathon -phackathon ai_hackathon < docs/migration/2026-08-19_schedule_items_add_position.sql
 
 # (2) 테스트 데이터 넣기 (재실행 가능 — 수정/삭제 테스트 후 다시 돌리면 초기화됨)
 mysql -h 127.0.0.1 -P 3307 -uhackathon -phackathon ai_hackathon < docs/test-data/seed_schedule.sql
 
-# (3) 서버 실행
+# (3) .env (gitignored) — DB 접속 + 로컬 테스트용 X-User-Id 헤더 폴백 켜기
+cat > .env <<'ENV'
+DB_URL=jdbc:mysql://127.0.0.1:3307/ai_hackathon?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&useUnicode=true
+DB_USERNAME=hackathon
+DB_PASSWORD=hackathon
+APP_AUTH_DEV_HEADER_ENABLED=true
+ENV
+
+# (4) 서버 실행 (ddl-auto: validate — 스키마가 엔티티와 다르면 기동 실패)
 ./gradlew bootRun
 ```
 
@@ -34,13 +43,13 @@ mysql -h 127.0.0.1 -P 3307 -uhackathon -phackathon ai_hackathon < docs/test-data
 
 CLI 로 돌리려면: `npx newman run docs/postman/schedule-api.postman_collection.json` / `npx newman run docs/postman/schedule-item-api.postman_collection.json` (각 실행 전 seed 재실행)
 
-## 3. 인증(임시) 방식
+## 3. 인증 방식
 
-설계서는 "서버 세션 + HttpOnly 쿠키"지만 1번 회원·인증 도메인이 아직 없어서, 지금은 **`X-User-Id` 헤더**로 사용자를 식별한다.
+운영 인증은 회원·인증 도메인의 **세션 쿠키 `SESSION`** (`POST /api/v1/auth/login` 응답의 Set-Cookie). 5·6번 API 는 `@LoginUser` 리졸버 → `SessionLoginUserProvider` 가 쿠키를 `AuthService.requireUser()` 로 검증해 userId 를 얻는다.
 
-- `global/auth/LoginUserProvider` (인터페이스) ← `HeaderLoginUserProvider` (임시 구현)
-- 세션 인증이 구현되면 **`LoginUserProvider` 구현체만 교체**하면 컨트롤러/서비스는 그대로.
-- 헤더가 없거나 숫자가 아니면 `401 UNAUTHORIZED`.
+- 쿠키 없음/만료/폐기 → `401 AUTHENTICATION_REQUIRED`
+- **로컬 테스트 편의**: `APP_AUTH_DEV_HEADER_ENABLED=true` 이면 쿠키가 없는 요청에 한해 `X-User-Id` 헤더로 사용자를 식별 (Postman 컬렉션이 이 방식). 운영에서는 반드시 false(기본값).
+- Postman 에서 실제 로그인으로 테스트하려면: `POST /auth/signup` → `POST /auth/login` 후 Postman 이 쿠키를 자동 보관하므로 `X-User-Id` 헤더를 지우고 호출하면 됨 (단, seed 스케줄은 user 1·2 소유라 새로 가입한 계정에는 안 보임).
 
 ## 4. seed 데이터 요약
 
@@ -71,7 +80,7 @@ CLI 로 돌리려면: `npx newman run docs/postman/schedule-api.postman_collecti
 | PATCH | `/schedule-items/{id}/status` | 200 `{itemId,status,completedAt,puzzlePieceAwarded,puzzlePieceId}` | 400 / 404 / 403 |
 | DELETE | `/schedule-items/{id}` | 204 (소프트 삭제) | 404 / 403 |
 
-모든 엔드포인트: 인증 없으면 401. 모든 응답에 `X-Request-Id` 헤더 + `meta.requestId`(성공) / `requestId`(실패).
+모든 엔드포인트: 인증 없으면 401 `AUTHENTICATION_REQUIRED`. 모든 응답에 `X-Request-Id` 헤더 + `meta.requestId`(성공) / `requestId`(실패).
 
 ## 6. 확정된 규칙 (설계서에 명시 안 됐던 부분 — 2026-08-19 합의)
 
@@ -89,13 +98,13 @@ CLI 로 돌리려면: `npx newman run docs/postman/schedule-api.postman_collecti
 | 오늘 기준 시간대 | `Asia/Seoul` 고정 (`ClockConfig`) | `users.timezone` 은 회원 도메인 확정 후 |
 | 일시 포맷 | `2026-08-19T17:33:31+09:00` (초 단위, ISO 8601 + 오프셋) | |
 | User/Category 연관 | `userId`, `categoryId` 를 Long 컬럼으로만 보유 (JPA 연관 X) | DB FK 는 ERD SQL 에 있음 |
-| 인증 | 임시 `X-User-Id` 헤더 (`LoginUserProvider` 구현체만 교체하면 세션으로 전환) | |
+| 인증 | 세션 쿠키 `SESSION` (`SessionLoginUserProvider` → `AuthService`). 로컬 테스트만 `APP_AUTH_DEV_HEADER_ENABLED=true` 로 `X-User-Id` 폴백 | |
 
 ### 6번 작업 API 추가 규칙 (2026-08-19 합의)
 
 | 항목 | 확정 | 비고 |
 |---|---|---|
-| 하루 최대 작업 수 | **`user_preferences.max_daily_tasks`** 를 PK 단건 조회(없으면 5) — `DailyTaskLimitProvider` | 엔티티 없이 `JdbcClient` 로 읽어 2번 도메인과 충돌 없음 |
+| 하루 최대 작업 수 | **`user_preferences.max_daily_tasks`**(없으면 5) — `PreferenceDailyTaskLimitProvider` 가 사용자 설정 도메인의 `UserPreferenceRepository` 사용 | |
 | 한도 계산 범위 | **사용자의 모든 스케줄 합산**, 그 날짜의 유효한 작업(삭제·CANCELLED 제외) | 작업 추가·날짜 변경 시 검사. 날짜를 옮길 땐 자기 자신 제외 |
 | 작업 날짜 | 스케줄 기간(`startDate`~`endDate`) 안 | 422 DATE_OUTSIDE_SCHEDULE_PERIOD |
 | `position` 기본값 | 미지정 시 같은 스케줄·같은 날짜의 `max(position)+1` (맨 뒤) | |

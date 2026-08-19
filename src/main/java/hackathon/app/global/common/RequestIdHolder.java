@@ -15,6 +15,12 @@ public final class RequestIdHolder {
         return MDC.get(MDC_KEY);
     }
 
+    /** 필터 밖(테스트 등)에서 호출돼 requestId 가 없으면 새로 만든다 */
+    public static String currentOrRandom() {
+        String id = MDC.get(MDC_KEY);
+        return id != null ? id : java.util.UUID.randomUUID().toString();
+    }
+
     public static void set(String requestId) {
         MDC.put(MDC_KEY, requestId);
     }

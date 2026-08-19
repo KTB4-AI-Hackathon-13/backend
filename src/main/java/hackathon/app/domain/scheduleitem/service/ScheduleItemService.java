@@ -15,8 +15,8 @@ import hackathon.app.domain.scheduleitem.policy.CategoryChecker;
 import hackathon.app.domain.scheduleitem.policy.DailyTaskLimitProvider;
 import hackathon.app.domain.scheduleitem.policy.PuzzlePieceAwarder;
 import hackathon.app.domain.scheduleitem.repository.ScheduleItemRepository;
-import hackathon.app.global.error.BusinessException;
-import hackathon.app.global.error.ErrorCode;
+import hackathon.app.common.error.ApiException;
+import hackathon.app.common.error.ErrorCode;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -86,7 +86,7 @@ public class ScheduleItemService {
     @Transactional
     public ScheduleItemResponse updateItem(Long userId, Long itemId, ScheduleItemUpdateRequest request) {
         if (request.isEmpty()) {
-            throw new BusinessException(ErrorCode.INVALID_REQUEST, "변경할 필드가 최소 하나 필요합니다.");
+            throw new ApiException(ErrorCode.INVALID_REQUEST, "변경할 필드가 최소 하나 필요합니다.");
         }
         ScheduleItem item = getOwnedItem(userId, itemId);
         Schedule schedule = item.getSchedule();
@@ -148,16 +148,16 @@ public class ScheduleItemService {
      */
     public ScheduleItem getOwnedItem(Long userId, Long itemId) {
         ScheduleItem item = scheduleItemRepository.findWithScheduleById(itemId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.SCHEDULE_ITEM_NOT_FOUND));
+                .orElseThrow(() -> new ApiException(ErrorCode.SCHEDULE_ITEM_NOT_FOUND));
         if (!item.getSchedule().isOwnedBy(userId)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN);
+            throw new ApiException(ErrorCode.FORBIDDEN);
         }
         return item;
     }
 
     private void validateDateInPeriod(Schedule schedule, LocalDate date) {
         if (!schedule.containsDate(date)) {
-            throw new BusinessException(ErrorCode.DATE_OUTSIDE_SCHEDULE_PERIOD,
+            throw new ApiException(ErrorCode.DATE_OUTSIDE_SCHEDULE_PERIOD,
                     "작업 날짜 " + date + " 가 스케줄 기간(" + schedule.getStartDate() + " ~ "
                             + schedule.getEndDate() + ") 밖입니다.");
         }
@@ -168,14 +168,14 @@ public class ScheduleItemService {
         long current = scheduleItemRepository.countUserItemsOnDate(userId, date, ScheduleItemStatus.CANCELLED,
                 excludeItemId);
         if (current >= limit) {
-            throw new BusinessException(ErrorCode.MAX_DAILY_TASKS_EXCEEDED,
+            throw new ApiException(ErrorCode.MAX_DAILY_TASKS_EXCEEDED,
                     date + " 에는 이미 " + current + "개의 작업이 있습니다. (하루 최대 " + limit + "개)");
         }
     }
 
     private void validateCategory(Long categoryId) {
         if (categoryId != null && !categoryChecker.existsActive(categoryId)) {
-            throw new BusinessException(ErrorCode.INVALID_REQUEST, "존재하지 않거나 사용 중지된 카테고리입니다: " + categoryId);
+            throw new ApiException(ErrorCode.INVALID_REQUEST, "존재하지 않거나 사용 중지된 카테고리입니다: " + categoryId);
         }
     }
 

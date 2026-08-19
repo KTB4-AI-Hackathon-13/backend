@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "75f5ccac-f6b7-492e-bd1f-e167a3ccf78f",
     "name": "AI Hackathon - 6. 작업 API",
-    "description": "설계서 6번 작업 API 테스트 컬렉션.\n\n사전 준비 (5번과 동일):\n1. `mysql -h 127.0.0.1 -P 3307 -uhackathon -phackathon ai_hackathon < docs/test-data/seed_schedule.sql`\n2. `./gradlew bootRun`\n\n확정 규칙: 하루 최대 작업 수 = user_preferences.max_daily_tasks(기본 5), 사용자 전체 스케줄 합산·CANCELLED 제외. 날짜는 스케줄 기간 안. 타인 작업 403. 추가/수정/삭제는 change log + 스케줄 버전 +1 (상태 변경은 제외). 퍼즐 조각 지급은 PuzzlePieceAwarder 포트 — 지금은 항상 awarded=false (7번 구현 후 실제 값).\n\n권장 실행 순서: 폴더 순서대로 Run Collection. 데이터가 바뀌므로 다시 돌리기 전에 seed 재실행.",
+    "description": "설계서 6번 작업 API 테스트 컬렉션.\n\n사전 준비 (5번과 동일):\n1. `mysql -h 127.0.0.1 -P 3307 -uhackathon -phackathon ai_hackathon < docs/test-data/seed_schedule.sql`\n2. `.env` 에 DB 정보 + `APP_AUTH_DEV_HEADER_ENABLED=true` 설정 후 `./gradlew bootRun`\n\n확정 규칙: 하루 최대 작업 수 = user_preferences.max_daily_tasks(기본 5), 사용자 전체 스케줄 합산·CANCELLED 제외. 날짜는 스케줄 기간 안. 타인 작업 403. 추가/수정/삭제는 change log + 스케줄 버전 +1 (상태 변경은 제외). 퍼즐 조각 지급은 PuzzlePieceAwarder 포트 — 지금은 항상 awarded=false (7번 구현 후 실제 값).\n\n권장 실행 순서: 폴더 순서대로 Run Collection. 데이터가 바뀌므로 다시 돌리기 전에 seed 재실행.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -533,7 +533,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"status 401\", () => pm.response.to.have.status(401));",
-                  "pm.test(\"code == UNAUTHORIZED\", () => pm.expect(pm.response.json().code).to.eql(\"UNAUTHORIZED\"));"
+                  "pm.test(\"code == AUTHENTICATION_REQUIRED\", () => pm.expect(pm.response.json().code).to.eql(\"AUTHENTICATION_REQUIRED\"));"
                 ]
               }
             }

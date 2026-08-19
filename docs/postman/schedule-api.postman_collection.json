@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "57bb4af6-7f94-46ee-acc4-a1287ea59708",
     "name": "AI Hackathon - 5. 스케줄 API",
-    "description": "설계서 5번 스케줄 API 테스트 컬렉션.\n\n사전 준비:\n1. `mysql -h 127.0.0.1 -P 3307 -uhackathon -phackathon ai_hackathon < docs/test-data/seed_schedule.sql`\n2. `./gradlew bootRun`\n\n확정 규칙: 응답은 설계서 8개 필드, 타인 스케줄 403, CANCELLED 작업은 퍼즐 수 제외, 같은 날짜 안 정렬 position→priority→id.\n\n변수: baseUrl(기본 http://localhost:8080/api/v1), userId(기본 1). 인증은 임시로 X-User-Id 헤더 사용.\n\n권장 실행 순서: 폴더 순서대로 Run Collection (수정/삭제는 데이터가 바뀌므로 다시 돌리려면 seed 재실행).",
+    "description": "설계서 5번 스케줄 API 테스트 컬렉션.\n\n사전 준비:\n1. `mysql -h 127.0.0.1 -P 3307 -uhackathon -phackathon ai_hackathon < docs/test-data/seed_schedule.sql`\n2. `.env` 에 DB 정보 + `APP_AUTH_DEV_HEADER_ENABLED=true` 설정 후 `./gradlew bootRun`\n\n확정 규칙: 응답은 설계서 8개 필드, 타인 스케줄 403, CANCELLED 작업은 퍼즐 수 제외, 같은 날짜 안 정렬 position→priority→id.\n\n변수: baseUrl(기본 http://localhost:8080/api/v1), userId(기본 1). 인증: 운영은 세션 쿠키(SESSION, POST /auth/login). 이 컬렉션은 로컬 테스트용 X-User-Id 헤더 폴백을 사용하므로 서버를 APP_AUTH_DEV_HEADER_ENABLED=true 로 띄워야 함 (.env 참고).\n\n권장 실행 순서: 폴더 순서대로 Run Collection (수정/삭제는 데이터가 바뀌므로 다시 돌리려면 seed 재실행).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -363,7 +363,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"status 401\", () => pm.response.to.have.status(401));",
-                  "pm.test(\"code == UNAUTHORIZED\", () => pm.expect(pm.response.json().code).to.eql(\"UNAUTHORIZED\"));"
+                  "pm.test(\"code == AUTHENTICATION_REQUIRED\", () => pm.expect(pm.response.json().code).to.eql(\"AUTHENTICATION_REQUIRED\"));"
                 ]
               }
             }

@@ -2,13 +2,13 @@ package hackathon.app.global.auth;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Optional;
-import org.springframework.stereotype.Component;
 
 /**
- * [임시] X-User-Id 헤더로 사용자를 식별한다.
- * 세션 인증이 구현되면 이 빈을 세션 기반 Provider 로 교체한다.
+ * X-User-Id 헤더로 사용자를 식별한다.
+ * 빈으로 등록하지 않는다 — 운영 인증은 {@link SessionLoginUserProvider}(세션 쿠키) 이며,
+ * 이 클래스는 (1) app.auth.dev-header-enabled=true 일 때 세션 쿠키가 없는 요청의 로컬 테스트 폴백,
+ * (2) 컨트롤러 슬라이스 테스트(@WebMvcTest 에서 @Import) 용도로만 쓴다.
  */
-@Component
 public class HeaderLoginUserProvider implements LoginUserProvider {
 
     public static final String HEADER = "X-User-Id";

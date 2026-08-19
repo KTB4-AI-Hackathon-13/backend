@@ -26,8 +26,8 @@ import hackathon.app.domain.scheduleitem.policy.CategoryChecker;
 import hackathon.app.domain.scheduleitem.policy.DailyTaskLimitProvider;
 import hackathon.app.domain.scheduleitem.policy.PuzzlePieceAwarder;
 import hackathon.app.domain.scheduleitem.repository.ScheduleItemRepository;
-import hackathon.app.global.error.BusinessException;
-import hackathon.app.global.error.ErrorCode;
+import hackathon.app.common.error.ApiException;
+import hackathon.app.common.error.ErrorCode;
 import java.lang.reflect.Field;
 import java.time.Clock;
 import java.time.Instant;
@@ -121,8 +121,8 @@ class ScheduleItemServiceTest {
 
         assertThatThrownBy(() -> service.createItem(USER_ID, SCHEDULE_ID,
                 new ScheduleItemCreateRequest("x", LocalDate.of(2026, 9, 1), null, null, null, null, null)))
-                .isInstanceOf(BusinessException.class)
-                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isInstanceOf(ApiException.class)
+                .extracting(e -> ((ApiException) e).errorCode())
                 .isEqualTo(ErrorCode.DATE_OUTSIDE_SCHEDULE_PERIOD);
         verify(scheduleItemRepository, never()).save(any());
     }
@@ -136,8 +136,8 @@ class ScheduleItemServiceTest {
 
         assertThatThrownBy(() -> service.createItem(USER_ID, SCHEDULE_ID,
                 new ScheduleItemCreateRequest("x", IN_PERIOD, null, null, null, null, null)))
-                .isInstanceOf(BusinessException.class)
-                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isInstanceOf(ApiException.class)
+                .extracting(e -> ((ApiException) e).errorCode())
                 .isEqualTo(ErrorCode.MAX_DAILY_TASKS_EXCEEDED);
     }
 
@@ -151,8 +151,8 @@ class ScheduleItemServiceTest {
 
         assertThatThrownBy(() -> service.createItem(USER_ID, SCHEDULE_ID,
                 new ScheduleItemCreateRequest("x", IN_PERIOD, null, 99L, null, null, null)))
-                .isInstanceOf(BusinessException.class)
-                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isInstanceOf(ApiException.class)
+                .extracting(e -> ((ApiException) e).errorCode())
                 .isEqualTo(ErrorCode.INVALID_REQUEST);
     }
 
@@ -166,8 +166,8 @@ class ScheduleItemServiceTest {
 
         assertThatThrownBy(() -> service.updateItem(OTHER_USER_ID, 1004L,
                 new ScheduleItemUpdateRequest("x", null, null, null, null, null, null)))
-                .isInstanceOf(BusinessException.class)
-                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isInstanceOf(ApiException.class)
+                .extracting(e -> ((ApiException) e).errorCode())
                 .isEqualTo(ErrorCode.FORBIDDEN);
     }
 
@@ -178,8 +178,8 @@ class ScheduleItemServiceTest {
 
         assertThatThrownBy(() -> service.updateItem(USER_ID, 999L,
                 new ScheduleItemUpdateRequest("x", null, null, null, null, null, null)))
-                .isInstanceOf(BusinessException.class)
-                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isInstanceOf(ApiException.class)
+                .extracting(e -> ((ApiException) e).errorCode())
                 .isEqualTo(ErrorCode.SCHEDULE_ITEM_NOT_FOUND);
     }
 
@@ -220,8 +220,8 @@ class ScheduleItemServiceTest {
     void updateItem_empty() {
         assertThatThrownBy(() -> service.updateItem(USER_ID, 1004L,
                 new ScheduleItemUpdateRequest(null, null, null, null, null, null, null)))
-                .isInstanceOf(BusinessException.class)
-                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isInstanceOf(ApiException.class)
+                .extracting(e -> ((ApiException) e).errorCode())
                 .isEqualTo(ErrorCode.INVALID_REQUEST);
     }
 

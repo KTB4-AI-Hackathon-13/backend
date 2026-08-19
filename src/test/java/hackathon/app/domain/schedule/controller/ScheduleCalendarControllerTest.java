@@ -14,7 +14,7 @@ import hackathon.app.global.auth.HeaderLoginUserProvider;
 import hackathon.app.global.auth.LoginUserArgumentResolver;
 import hackathon.app.global.common.RequestIdFilter;
 import hackathon.app.global.config.WebConfig;
-import hackathon.app.global.error.GlobalExceptionHandler;
+import hackathon.app.common.error.GlobalExceptionHandler;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;

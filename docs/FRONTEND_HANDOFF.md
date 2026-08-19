@@ -11,7 +11,8 @@
 | Base URL (로컬) | `http://localhost:8080/api/v1` |
 | Content-Type | `application/json` (요청·응답) |
 | CORS | `http://localhost:5173`, `http://localhost:3000` 허용 (다른 포트면 백엔드 `APP_CORS_ALLOWED_ORIGINS` 환경변수로 추가 요청). `credentials: 'include'` 가능 |
-| **인증 (임시)** | 모든 요청에 헤더 **`X-User-Id: <숫자 userId>`**. 회원·인증 도메인(세션+HttpOnly 쿠키)이 붙으면 이 헤더는 없어지고 쿠키로 대체됨 → **API 호출 모듈 한 곳에서 헤더를 붙이도록** 만들어 두면 나중에 한 줄만 바꾸면 됨. 헤더 없으면 `401 UNAUTHORIZED` |
+| **인증** | **세션 쿠키 `SESSION`** (HttpOnly). `POST /api/v1/auth/signup` → `POST /api/v1/auth/login` 하면 Set-Cookie 로 내려옴. 이후 모든 요청을 **`credentials: 'include'`** (fetch) / `withCredentials: true` (axios) 로 보내면 브라우저가 쿠키를 자동 첨부. 로그아웃 `POST /api/v1/auth/logout`. 쿠키 없음/만료 → `401 AUTHENTICATION_REQUIRED`. (회원 API 상세는 인증 담당 팀원 문서 참고) |
+| 인증 (로컬 개발 편의) | 백엔드를 `APP_AUTH_DEV_HEADER_ENABLED=true` 로 띄우면 쿠키 없는 요청에 한해 헤더 `X-User-Id: 1` 로 seed 사용자 행세 가능. 로그인 화면 만들기 전 단계에서만 사용, 운영엔 없음 |
 | 날짜 | `YYYY-MM-DD` (예 `2026-08-19`) |
 | 일시 | ISO 8601 + 오프셋 (예 `2026-08-19T21:16:03+09:00`), 초 단위 |
 | 요청 추적 | 모든 응답 헤더 `X-Request-Id` + 본문 `requestId` (버그 제보 시 같이 전달) |
@@ -33,23 +34,15 @@
 ```json
 {
   "code": "INVALID_REQUEST",
+  "message": "요청값을 확인해주세요.",
   "fieldErrors": [
-    {
-      "field": "title",
-      "rejectedValue": null,
-      "reason": "제목은 필수입니다."
-    },
-    {
-      "field": "priority",
-      "rejectedValue": 9,
-      "reason": "priority 는 1~5 입니다."
-    }
+    { "field": "title", "message": "제목은 필수입니다." },
+    { "field": "priority", "message": "priority 는 1~5 입니다." }
   ],
-  "message": "잘못된 요청 형식입니다.",
   "requestId": "104b4ecd-7106-4de3-acde-9bcebe1b50a6"
 }
 ```
-- `code` 로 분기, `message` 는 사용자에게 보여줘도 되는 한국어. `fieldErrors` 는 본문/파라미터 검증 실패(400)일 때만 채워짐.
+- `code` 로 분기, `message` 는 사용자에게 보여줘도 되는 한국어. `fieldErrors[]` (`{field, message}`) 는 본문/파라미터 검증 실패(400)일 때만 채워짐.
 - `204 No Content` 는 본문 없음.
 
 ### 공통 상태 코드
@@ -58,7 +51,7 @@
 | 200 / 201 / 204 | 성공 | |
 | 400 `INVALID_REQUEST` | 형식·검증 오류 (`fieldErrors` 참고) | 입력 폼 에러 표시 |
 | 400 `INVALID_CURSOR` | 커서 깨짐 | 첫 페이지부터 다시 |
-| 401 `UNAUTHORIZED` | 인증 없음 | 로그인 화면 |
+| 401 `AUTHENTICATION_REQUIRED` | 세션 없음/만료 | 로그인 화면 |
 | 403 `FORBIDDEN` | 남의 스케줄/작업 | "권한 없음" |
 | 404 `SCHEDULE_NOT_FOUND` / `SCHEDULE_ITEM_NOT_FOUND` | 없음 또는 삭제됨 | 목록으로 |
 | 409 `ITEMS_OUTSIDE_SCHEDULE_PERIOD` | 기간 축소 시 범위 밖 작업 존재 | 메시지 표시 |
@@ -412,7 +405,9 @@ interface DailyItem {                   // 캘린더 / 오늘 할 일 항목 (�
 ```bash
 # 백엔드 레포에서
 docker ps | grep ai-hackathon-mysql          # MySQL 127.0.0.1:3307 (hackathon/hackathon, DB ai_hackathon)
+mysql -h 127.0.0.1 -P 3307 -uhackathon -phackathon ai_hackathon < docs/migration/2026-08-19_schedule_items_add_position.sql  # 최초 1회
 mysql -h 127.0.0.1 -P 3307 -uhackathon -phackathon ai_hackathon < docs/test-data/seed_schedule.sql
+# .env: DB_URL / DB_USERNAME / DB_PASSWORD + APP_AUTH_DEV_HEADER_ENABLED=true (docs/postman/README.md 참고)
 ./gradlew bootRun                             # http://localhost:8080
 ```
 seed 데이터 (헤더 `X-User-Id: 1` 로 호출):
@@ -440,5 +435,5 @@ Postman: `docs/postman/schedule-api.postman_collection.json`(5번 33요청), `do
 | 하루 최대 작업 수 | `user_preferences.max_daily_tasks`(설정 API, 기본 5). **사용자 전체 스케줄 합산** |
 | 상태 변경 | `completedAt` 은 COMPLETED 첫 진입 시, 다른 상태로 가면 null. 변경 이력/버전에 남기지 않음 |
 | 추가/수정/삭제 | `currentVersion` +1 (프론트는 표시만) |
-| 인증 | 임시 `X-User-Id` 헤더 → 추후 세션 쿠키 |
+| 인증 | 세션 쿠키 `SESSION` (`credentials: 'include'` 필수). 로컬 개발 한정 `X-User-Id` 폴백 |
 | 퍼즐 조각 | 7번 구현 전까지 `puzzlePieceAwarded=false` |

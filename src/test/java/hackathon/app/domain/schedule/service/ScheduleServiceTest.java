@@ -19,8 +19,8 @@ import hackathon.app.domain.schedule.entity.ScheduleStatus;
 import hackathon.app.domain.schedule.repository.ScheduleRepository;
 import hackathon.app.domain.scheduleitem.entity.ScheduleItemStatus;
 import hackathon.app.domain.scheduleitem.repository.ScheduleItemRepository;
-import hackathon.app.global.error.BusinessException;
-import hackathon.app.global.error.ErrorCode;
+import hackathon.app.common.error.ApiException;
+import hackathon.app.common.error.ErrorCode;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -70,8 +70,8 @@ class ScheduleServiceTest {
         when(scheduleRepository.findById(SCHEDULE_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> scheduleService.getSchedule(USER_ID, SCHEDULE_ID))
-                .isInstanceOf(BusinessException.class)
-                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isInstanceOf(ApiException.class)
+                .extracting(e -> ((ApiException) e).errorCode())
                 .isEqualTo(ErrorCode.SCHEDULE_NOT_FOUND);
     }
 
@@ -81,8 +81,8 @@ class ScheduleServiceTest {
         when(scheduleRepository.findById(SCHEDULE_ID)).thenReturn(Optional.of(schedule));
 
         assertThatThrownBy(() -> scheduleService.getSchedule(999L, SCHEDULE_ID))
-                .isInstanceOf(BusinessException.class)
-                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isInstanceOf(ApiException.class)
+                .extracting(e -> ((ApiException) e).errorCode())
                 .isEqualTo(ErrorCode.FORBIDDEN);
     }
 
@@ -92,8 +92,8 @@ class ScheduleServiceTest {
         ScheduleUpdateRequest request = new ScheduleUpdateRequest(null, null, null, null);
 
         assertThatThrownBy(() -> scheduleService.updateSchedule(USER_ID, SCHEDULE_ID, request))
-                .isInstanceOf(BusinessException.class)
-                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isInstanceOf(ApiException.class)
+                .extracting(e -> ((ApiException) e).errorCode())
                 .isEqualTo(ErrorCode.INVALID_REQUEST);
         verify(scheduleRepository, never()).findById(any());
     }
@@ -105,8 +105,8 @@ class ScheduleServiceTest {
         ScheduleUpdateRequest request = new ScheduleUpdateRequest(null, null, LocalDate.of(2026, 9, 1), null);
 
         assertThatThrownBy(() -> scheduleService.updateSchedule(USER_ID, SCHEDULE_ID, request))
-                .isInstanceOf(BusinessException.class)
-                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isInstanceOf(ApiException.class)
+                .extracting(e -> ((ApiException) e).errorCode())
                 .isEqualTo(ErrorCode.INVALID_SCHEDULE_PERIOD);
     }
 
@@ -119,8 +119,8 @@ class ScheduleServiceTest {
         ScheduleUpdateRequest request = new ScheduleUpdateRequest(null, null, null, LocalDate.of(2026, 8, 20));
 
         assertThatThrownBy(() -> scheduleService.updateSchedule(USER_ID, SCHEDULE_ID, request))
-                .isInstanceOf(BusinessException.class)
-                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isInstanceOf(ApiException.class)
+                .extracting(e -> ((ApiException) e).errorCode())
                 .isEqualTo(ErrorCode.ITEMS_OUTSIDE_SCHEDULE_PERIOD);
         assertThat(schedule.getCurrentVersion()).isEqualTo(1);
         verify(changeLogger, never()).log(any(), any(), any(), any(), any(), anyInt(), any(), any(), any());

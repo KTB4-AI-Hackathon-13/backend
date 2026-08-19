@@ -1,7 +1,7 @@
 package hackathon.app.global.common;
 
-import hackathon.app.global.error.BusinessException;
-import hackathon.app.global.error.ErrorCode;
+import hackathon.app.common.error.ApiException;
+import hackathon.app.common.error.ErrorCode;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
@@ -30,7 +30,7 @@ public final class CursorCodec {
             String raw = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
             return Long.parseLong(raw);
         } catch (IllegalArgumentException e) {
-            throw new BusinessException(ErrorCode.INVALID_CURSOR);
+            throw new ApiException(ErrorCode.INVALID_CURSOR);
         }
     }
 }

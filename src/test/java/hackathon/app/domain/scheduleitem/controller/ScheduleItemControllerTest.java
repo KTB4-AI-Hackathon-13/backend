@@ -18,9 +18,9 @@ import hackathon.app.global.auth.HeaderLoginUserProvider;
 import hackathon.app.global.auth.LoginUserArgumentResolver;
 import hackathon.app.global.common.RequestIdFilter;
 import hackathon.app.global.config.WebConfig;
-import hackathon.app.global.error.BusinessException;
-import hackathon.app.global.error.ErrorCode;
-import hackathon.app.global.error.GlobalExceptionHandler;
+import hackathon.app.common.error.ApiException;
+import hackathon.app.common.error.ErrorCode;
+import hackathon.app.common.error.GlobalExceptionHandler;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import org.junit.jupiter.api.DisplayName;
@@ -74,7 +74,7 @@ class ScheduleItemControllerTest {
     @DisplayName("POST /schedules/{id}/items — 한도 초과면 422 MAX_DAILY_TASKS_EXCEEDED")
     void createItem_limit_returns422() throws Exception {
         when(scheduleItemService.createItem(eq(1L), eq(101L), any()))
-                .thenThrow(new BusinessException(ErrorCode.MAX_DAILY_TASKS_EXCEEDED));
+                .thenThrow(new ApiException(ErrorCode.MAX_DAILY_TASKS_EXCEEDED));
 
         mockMvc.perform(post("/api/v1/schedules/101/items").header("X-User-Id", "1")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -98,7 +98,7 @@ class ScheduleItemControllerTest {
     @DisplayName("PATCH /schedule-items/{id} — 기간 밖 날짜면 422 DATE_OUTSIDE_SCHEDULE_PERIOD")
     void updateItem_outsidePeriod_returns422() throws Exception {
         when(scheduleItemService.updateItem(eq(1L), eq(2002L), any()))
-                .thenThrow(new BusinessException(ErrorCode.DATE_OUTSIDE_SCHEDULE_PERIOD));
+                .thenThrow(new ApiException(ErrorCode.DATE_OUTSIDE_SCHEDULE_PERIOD));
 
         mockMvc.perform(patch("/api/v1/schedule-items/2002").header("X-User-Id", "1")
                         .contentType(MediaType.APPLICATION_JSON).content("{\"scheduledDate\":\"2026-09-05\"}"))
@@ -142,7 +142,7 @@ class ScheduleItemControllerTest {
     @Test
     @DisplayName("DELETE /schedule-items/{id} — 타인 소유면 403")
     void deleteItem_forbidden_returns403() throws Exception {
-        doThrow(new BusinessException(ErrorCode.FORBIDDEN)).when(scheduleItemService).deleteItem(1L, 2001L);
+        doThrow(new ApiException(ErrorCode.FORBIDDEN)).when(scheduleItemService).deleteItem(1L, 2001L);
 
         mockMvc.perform(delete("/api/v1/schedule-items/2001").header("X-User-Id", "1"))
                 .andExpect(status().isForbidden())

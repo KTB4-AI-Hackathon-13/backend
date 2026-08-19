@@ -9,7 +9,7 @@ import hackathon.app.domain.scheduleitem.service.ScheduleItemService;
 import hackathon.app.global.auth.LoginUser;
 import hackathon.app.global.auth.LoginUserInfo;
 import hackathon.app.global.common.ApiPaths;
-import hackathon.app.global.common.ApiResponse;
+import hackathon.app.common.api.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

@@ -1,7 +1,7 @@
 package hackathon.app.global.auth;
 
-import hackathon.app.global.error.BusinessException;
-import hackathon.app.global.error.ErrorCode;
+import hackathon.app.common.error.ApiException;
+import hackathon.app.common.error.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.MethodParameter;
@@ -11,7 +11,7 @@ import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
-/** @LoginUser LoginUserInfo 파라미터를 채워준다. 식별 실패 시 401 UNAUTHORIZED. */
+/** @LoginUser LoginUserInfo 파라미터를 채워준다. 식별 실패 시 401 AUTHENTICATION_REQUIRED. */
 @Component
 @RequiredArgsConstructor
 public class LoginUserArgumentResolver implements HandlerMethodArgumentResolver {
@@ -29,9 +29,9 @@ public class LoginUserArgumentResolver implements HandlerMethodArgumentResolver 
                                   NativeWebRequest webRequest, WebDataBinderFactory binderFactory) {
         HttpServletRequest request = webRequest.getNativeRequest(HttpServletRequest.class);
         if (request == null) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED);
+            throw new ApiException(ErrorCode.AUTHENTICATION_REQUIRED);
         }
         return loginUserProvider.resolve(request)
-                .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
+                .orElseThrow(() -> new ApiException(ErrorCode.AUTHENTICATION_REQUIRED));
     }
 }
