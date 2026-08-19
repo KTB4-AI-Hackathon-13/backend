@@ -1,0 +1,1493 @@
+{
+  "info": {
+    "_postman_id": "57bb4af6-7f94-46ee-acc4-a1287ea59708",
+    "name": "AI Hackathon - 5. 스케줄 API",
+    "description": "설계서 5번 스케줄 API 테스트 컬렉션.\n\n사전 준비:\n1. `mysql -h 127.0.0.1 -P 3307 -uhackathon -phackathon ai_hackathon < docs/test-data/seed_schedule.sql`\n2. `./gradlew bootRun`\n\n확정 규칙: 응답은 설계서 8개 필드, 타인 스케줄 403, CANCELLED 작업은 퍼즐 수 제외, 같은 날짜 안 정렬 position→priority→id.\n\n변수: baseUrl(기본 http://localhost:8080/api/v1), userId(기본 1). 인증은 임시로 X-User-Id 헤더 사용.\n\n권장 실행 순서: 폴더 순서대로 Run Collection (수정/삭제는 데이터가 바뀌므로 다시 돌리려면 seed 재실행).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080/api/v1"
+    },
+    {
+      "key": "userId",
+      "value": "1"
+    },
+    {
+      "key": "scheduleId",
+      "value": "101"
+    },
+    {
+      "key": "nextCursor",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. 스케줄 목록 GET /schedules",
+      "item": [
+        {
+          "name": "목록 - 기본",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedules",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedules"
+              ]
+            },
+            "description": "status/size/cursor 없이 전체. 소프트삭제(105)는 안 나와야 함. 각 항목에 puzzleCount/completedPuzzleCount 포함."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"meta.requestId 존재\", () => pm.expect(pm.response.json().meta.requestId).to.be.a(\"string\"));",
+                  "const d = pm.response.json().data;",
+                  "pm.test(\"items/nextCursor/hasNext 구조\", () => { pm.expect(d).to.have.keys(\"items\",\"nextCursor\",\"hasNext\"); });",
+                  "pm.test(\"삭제된 스케줄(105) 미포함\", () => pm.expect(d.items.map(i=>i.id)).to.not.include(105));",
+                  "pm.test(\"퍼즐 수 필드 존재\", () => { pm.expect(d.items[0]).to.have.property(\"puzzleCount\"); pm.expect(d.items[0]).to.have.property(\"completedPuzzleCount\"); });",
+                  "pm.test(\"id 내림차순\", () => { const ids=d.items.map(i=>i.id); pm.expect(ids).to.eql([...ids].sort((a,b)=>b-a)); });",
+                  "pm.test(\"항목은 설계서 8개 필드만\", () => pm.expect(Object.keys(d.items[0]).sort()).to.eql([\"completedPuzzleCount\",\"currentVersion\",\"endDate\",\"id\",\"puzzleCount\",\"startDate\",\"status\",\"title\"]));",
+                  "pm.test(\"101 puzzleCount 7 (삭제 1·취소 1 제외)\", () => { const s=d.items.find(i=>i.id===101); pm.expect(s.puzzleCount).to.eql(7); pm.expect(s.completedPuzzleCount).to.eql(2); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "목록 - status=ACTIVE&size=1 (커서 저장)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedules?status=ACTIVE&size=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedules"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "ACTIVE"
+                },
+                {
+                  "key": "size",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "hasNext=true, nextCursor 저장 → 다음 요청에서 사용"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "pm.test(\"1건만\", () => pm.expect(d.items.length).to.eql(1));",
+                  "pm.test(\"hasNext true & nextCursor 존재\", () => { pm.expect(d.hasNext).to.be.true; pm.expect(d.nextCursor).to.be.a(\"string\"); });",
+                  "pm.collectionVariables.set(\"nextCursor\", d.nextCursor);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "목록 - 다음 페이지 (cursor)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedules?status=ACTIVE&size=1&cursor={{nextCursor}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedules"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "ACTIVE"
+                },
+                {
+                  "key": "size",
+                  "value": "1"
+                },
+                {
+                  "key": "cursor",
+                  "value": "{{nextCursor}}"
+                }
+              ]
+            },
+            "description": "이전 요청에서 저장한 nextCursor 사용. 이전 페이지보다 작은 id 가 나와야 함."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "pm.test(\"ACTIVE 만\", () => d.items.forEach(i => pm.expect(i.status).to.eql(\"ACTIVE\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "목록 - status=COMPLETED",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedules?status=COMPLETED",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedules"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "COMPLETED"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"COMPLETED 만\", () => pm.response.json().data.items.forEach(i => pm.expect(i.status).to.eql(\"COMPLETED\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[400] 목록 - size=0",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedules?size=0",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedules"
+              ],
+              "query": [
+                {
+                  "key": "size",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code == INVALID_REQUEST\", () => pm.expect(pm.response.json().code).to.eql(\"INVALID_REQUEST\"));",
+                  "pm.test(\"fieldErrors.size\", () => pm.expect(pm.response.json().fieldErrors[0].field).to.eql(\"size\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[400] 목록 - 잘못된 status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedules?status=FOO",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedules"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "FOO"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code == INVALID_REQUEST\", () => pm.expect(pm.response.json().code).to.eql(\"INVALID_REQUEST\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[400] 목록 - 잘못된 cursor",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedules?cursor=!!bad",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedules"
+              ],
+              "query": [
+                {
+                  "key": "cursor",
+                  "value": "!!bad"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code == INVALID_CURSOR\", () => pm.expect(pm.response.json().code).to.eql(\"INVALID_CURSOR\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[401] 목록 - 인증 헤더 없음",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/schedules",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedules"
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"code == UNAUTHORIZED\", () => pm.expect(pm.response.json().code).to.eql(\"UNAUTHORIZED\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. 스케줄 상세 GET /schedules/{scheduleId}",
+      "item": [
+        {
+          "name": "상세 - 101",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedules/{{scheduleId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedules",
+                "{{scheduleId}}"
+              ]
+            },
+            "description": "계획 요약(설계서 8개 필드) + days[](날짜별 작업, position→priority→id 정렬) + 퍼즐 수(CANCELLED 제외). 소프트삭제 작업(1008)은 안 나와야 함."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"meta.requestId 존재\", () => pm.expect(pm.response.json().meta.requestId).to.be.a(\"string\"));",
+                  "const d = pm.response.json().data;",
+                  "pm.test(\"요약 필드\", () => pm.expect(d).to.include.keys(\"id\",\"title\",\"status\",\"startDate\",\"endDate\",\"currentVersion\",\"puzzleCount\",\"completedPuzzleCount\",\"days\"));",
+                  "pm.test(\"days 날짜 오름차순\", () => { const ds=d.days.map(x=>x.date); pm.expect(ds).to.eql([...ds].sort()); });",
+                  "pm.test(\"삭제된 작업(1008) 미포함\", () => { const ids=d.days.flatMap(x=>x.items.map(i=>i.id)); pm.expect(ids).to.not.include(1008); });",
+                  "pm.test(\"puzzleCount == 유효 작업 수(CANCELLED 제외)\", () => { const n=d.days.flatMap(x=>x.items).filter(i=>i.status!==\"CANCELLED\").length; pm.expect(d.puzzleCount).to.eql(n); });",
+                  "pm.test(\"설계서 8개 필드 + days (source/createdAt 없음)\", () => { pm.expect(d).to.not.have.property(\"source\"); pm.expect(d).to.not.have.property(\"createdAt\"); });",
+                  "pm.test(\"같은 날짜 안 position 오름차순\", () => d.days.forEach(x => { const ps=x.items.map(i=>i.position); pm.expect(ps).to.eql([...ps].sort((a,b)=>a-b)); }));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[403] 상세 - 타인 소유 (201)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedules/201",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedules",
+                "201"
+              ]
+            },
+            "description": "tester2 소유 → 403 FORBIDDEN (존재하지만 권한 없음)"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"code == FORBIDDEN\", () => pm.expect(pm.response.json().code).to.eql(\"FORBIDDEN\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[404] 상세 - 소프트삭제 (105)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedules/105",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedules",
+                "105"
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"code == SCHEDULE_NOT_FOUND\", () => pm.expect(pm.response.json().code).to.eql(\"SCHEDULE_NOT_FOUND\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[404] 상세 - 없는 id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedules/999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedules",
+                "999999"
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"code == SCHEDULE_NOT_FOUND\", () => pm.expect(pm.response.json().code).to.eql(\"SCHEDULE_NOT_FOUND\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[400] 상세 - id 형식 오류",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedules/abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedules",
+                "abc"
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code == INVALID_REQUEST\", () => pm.expect(pm.response.json().code).to.eql(\"INVALID_REQUEST\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. 스케줄 수정 PATCH /schedules/{scheduleId}",
+      "item": [
+        {
+          "name": "수정 - 제목/설명 (102)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedules/102",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedules",
+                "102"
+              ]
+            },
+            "description": "currentVersion +1, schedule_change_logs 에 UPDATE 기록",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"스프링 강의 완강 (수정)\",\n  \"description\": \"설명 수정\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "pm.test(\"제목 변경됨\", () => pm.expect(d.title).to.eql(\"스프링 강의 완강 (수정)\"));",
+                  "pm.test(\"버전 증가\", () => pm.expect(d.currentVersion).to.be.above(1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[409] 수정 - 기간 축소 시 범위 밖 작업 존재 (102 endDate=09-01)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedules/102",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedules",
+                "102"
+              ]
+            },
+            "description": "102 에는 2026-09-03 작업이 있어서 충돌",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"endDate\": \"2026-09-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"code == ITEMS_OUTSIDE_SCHEDULE_PERIOD\", () => pm.expect(pm.response.json().code).to.eql(\"ITEMS_OUTSIDE_SCHEDULE_PERIOD\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[422] 수정 - startDate > endDate",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedules/102",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedules",
+                "102"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"startDate\": \"2026-09-20\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"code == INVALID_SCHEDULE_PERIOD\", () => pm.expect(pm.response.json().code).to.eql(\"INVALID_SCHEDULE_PERIOD\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "수정 - 기간 확장 (102 endDate=09-10)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedules/102",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedules",
+                "102"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"endDate\": \"2026-09-10\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"endDate 변경\", () => pm.expect(pm.response.json().data.endDate).to.eql(\"2026-09-10\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "수정 - 기간 축소, 범위 밖엔 CANCELLED 작업만 (101 endDate=08-29)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedules/101",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedules",
+                "101"
+              ]
+            },
+            "description": "08-30 에 CANCELLED 작업(1009)만 있음 → 취소 작업은 충돌 대상에서 제외 → 200",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"endDate\": \"2026-08-29\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"endDate 변경\", () => pm.expect(pm.response.json().data.endDate).to.eql(\"2026-08-29\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[400] 수정 - 빈 본문 {}",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedules/102",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedules",
+                "102"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code == INVALID_REQUEST\", () => pm.expect(pm.response.json().code).to.eql(\"INVALID_REQUEST\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[400] 수정 - title 201자",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedules/102",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedules",
+                "102"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code == INVALID_REQUEST\", () => pm.expect(pm.response.json().code).to.eql(\"INVALID_REQUEST\"));",
+                  "pm.test(\"fieldErrors.title\", () => pm.expect(pm.response.json().fieldErrors[0].field).to.eql(\"title\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[400] 수정 - 날짜 형식 오류",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedules/102",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedules",
+                "102"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"startDate\": \"2026/08/20\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code == INVALID_REQUEST\", () => pm.expect(pm.response.json().code).to.eql(\"INVALID_REQUEST\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[403] 수정 - 타인 소유 (201)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedules/201",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedules",
+                "201"
+              ]
+            },
+            "description": "tester2 소유 → 403 FORBIDDEN (존재하지만 권한 없음)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"해킹\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"code == FORBIDDEN\", () => pm.expect(pm.response.json().code).to.eql(\"FORBIDDEN\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. 월별 캘린더 GET /calendar · 오늘 할 일 GET /schedule-items/today",
+      "item": [
+        {
+          "name": "캘린더 - 2026-08",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/calendar?year=2026&month=8",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "calendar"
+              ],
+              "query": [
+                {
+                  "key": "year",
+                  "value": "2026"
+                },
+                {
+                  "key": "month",
+                  "value": "8"
+                }
+              ]
+            },
+            "description": "작업이 있는 날짜만 days 에 포함. 여러 스케줄의 작업이 섞여 나옴(scheduleTitle 포함). 삭제된 스케줄(105)/작업(1008) 제외."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "pm.test(\"year/month\", () => { pm.expect(d.year).to.eql(2026); pm.expect(d.month).to.eql(8); });",
+                  "pm.test(\"days 구조\", () => { pm.expect(d.days[0]).to.include.keys(\"date\",\"totalCount\",\"completedCount\",\"items\"); pm.expect(d.days[0].items[0]).to.include.keys(\"id\",\"scheduleId\",\"scheduleTitle\",\"title\",\"status\",\"priority\"); });",
+                  "pm.test(\"삭제 스케줄 작업(1401)/삭제 작업(1008) 미포함\", () => { const ids=d.days.flatMap(x=>x.items.map(i=>i.id)); pm.expect(ids).to.not.include(1401); pm.expect(ids).to.not.include(1008); });",
+                  "pm.test(\"8월 날짜만\", () => d.days.forEach(x => pm.expect(x.date).to.match(/^2026-08-/)));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "캘린더 - 2026-07 (103 삭제 전이면 2건)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/calendar?year=2026&month=7",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "calendar"
+              ],
+              "query": [
+                {
+                  "key": "year",
+                  "value": "2026"
+                },
+                {
+                  "key": "month",
+                  "value": "7"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[400] 캘린더 - month=13",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/calendar?year=2026&month=13",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "calendar"
+              ],
+              "query": [
+                {
+                  "key": "year",
+                  "value": "2026"
+                },
+                {
+                  "key": "month",
+                  "value": "13"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code == INVALID_REQUEST\", () => pm.expect(pm.response.json().code).to.eql(\"INVALID_REQUEST\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[400] 캘린더 - year 누락",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/calendar?month=8",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "calendar"
+              ],
+              "query": [
+                {
+                  "key": "month",
+                  "value": "8"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code == INVALID_REQUEST\", () => pm.expect(pm.response.json().code).to.eql(\"INVALID_REQUEST\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "오늘 할 일 (user 1)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedule-items/today",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedule-items",
+                "today"
+              ]
+            },
+            "description": "기준 시간대 Asia/Seoul. seed 는 2026-08-19 에 user1 작업 3건(1004,1005,1302)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "pm.test(\"필드\", () => pm.expect(d).to.have.keys(\"date\",\"totalCount\",\"completedCount\",\"items\"));",
+                  "pm.test(\"totalCount == items.length\", () => pm.expect(d.totalCount).to.eql(d.items.length));",
+                  "pm.test(\"date = YYYY-MM-DD\", () => pm.expect(d.date).to.match(/^\\d{4}-\\d{2}-\\d{2}$/));",
+                  "pm.test(\"position 오름차순 (1005 가 1004 보다 먼저)\", () => { const ids=d.items.map(i=>i.id); pm.expect(ids.indexOf(1005)).to.be.below(ids.indexOf(1004)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "오늘 할 일 (user 2 - 격리 확인)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "2",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedule-items/today",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedule-items",
+                "today"
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"user1 작업 미포함\", () => pm.response.json().data.items.forEach(i => pm.expect(i.scheduleId).to.not.be.oneOf([101,102,103,104])));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. 스케줄 삭제 DELETE /schedules/{scheduleId}",
+      "item": [
+        {
+          "name": "삭제 - 103 → 204",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedules/103",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedules",
+                "103"
+              ]
+            },
+            "description": "스케줄 + 하위 작업 소프트 삭제, change log DELETE 기록"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[404] 삭제 - 103 다시",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedules/103",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedules",
+                "103"
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"code == SCHEDULE_NOT_FOUND\", () => pm.expect(pm.response.json().code).to.eql(\"SCHEDULE_NOT_FOUND\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[403] 삭제 - 타인 소유 (201)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedules/201",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedules",
+                "201"
+              ]
+            },
+            "description": "tester2 소유 → 403 FORBIDDEN (존재하지만 권한 없음)"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"code == FORBIDDEN\", () => pm.expect(pm.response.json().code).to.eql(\"FORBIDDEN\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "삭제 후 목록에 103 없음",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedules",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedules"
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"103 미포함\", () => pm.expect(pm.response.json().data.items.map(i=>i.id)).to.not.include(103));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "삭제 후 7월 캘린더 비어있음",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "임시 인증 헤더 (세션 도입 전)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/calendar?year=2026&month=7",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "calendar"
+              ],
+              "query": [
+                {
+                  "key": "year",
+                  "value": "2026"
+                },
+                {
+                  "key": "month",
+                  "value": "7"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"totalCount 0\", () => pm.expect(pm.response.json().data.totalCount).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
