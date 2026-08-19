@@ -32,7 +32,7 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::wnsgh7368:role/github-actions-ecr
+          role-to-assume: arn:aws:iam::707071531352:role/github-actions-ecr
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
@@ -51,7 +51,7 @@ jobs:
           envs: IMAGE_TAG
           script: |
             aws ecr get-login-password --region ${{ env.AWS_REGION }} \
-              | docker login --username AWS --password-stdin wnsgh7368.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+              | docker login --username AWS --password-stdin 707071531352.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
             cd ~/app
             export IMAGE_TAG=$IMAGE_TAG
             docker compose pull
