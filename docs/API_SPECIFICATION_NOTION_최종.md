@@ -239,9 +239,9 @@ WHERE schedule_id = :schedule_id
 
 | 기능 | Method | URL | 인증 | 주요 요청값 | 주요 응답값 | 연결 테이블 |
 |---|---|---|---:|---|---|---|
-| 내 퍼즐 목록 | GET | `/puzzles/mine` | O | `status?`, `size?`, `cursor?` | 진행·완성 퍼즐 목록 | `puzzles` 추가 필요 |
-| 내 퍼즐 상세 | GET | `/puzzles/{puzzleId}` | O | 없음 | 퍼즐 정보, 조각별 획득 상태 | `puzzles`, `puzzle_pieces` 추가 필요 |
-| 사용자 공개 퍼즐 | GET | `/users/{userId}/public-puzzles` | 선택 | `sort?`, `size?`, `cursor?` | 특정 사용자의 공개 퍼즐 | 퍼즐 테이블 필요 |
+| ✅ 내 퍼즐 목록 | GET | `/puzzles/mine` | O | `status?`, `size?`, `cursor?` | 진행·완성 퍼즐 목록 | `puzzles` 추가 필요 |
+| ✅ 내 퍼즐 상세 | GET | `/puzzles/{puzzleId}` | O | 없음 | 퍼즐 정보, 조각별 획득 상태 | `puzzles`, `puzzle_pieces` 추가 필요 |
+| ✅ 사용자 공개 퍼즐 | GET | `/users/{userId}/public-puzzles` | 선택 | `sort?`, `size?`, `cursor?` | 특정 사용자의 공개 퍼즐 | 퍼즐 테이블 필요 |
 
 ### 2차 퍼즐 API
 
