@@ -37,6 +37,16 @@ jobs:
           push: true
           tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
 
+      # 레포의 docker-compose.yml 을 EC2로 복사 (배포 구성을 코드로 관리)
+      - name: Copy docker-compose.yml to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: docker-compose.yml
+          target: ~/app
+
       - name: Deploy to EC2 (docker compose up)
         uses: appleboy/ssh-action@v1
         env:
