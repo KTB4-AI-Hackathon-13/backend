@@ -1,5 +1,5 @@
 # -----| 빌드 스테이지 |----- #
-FROM eclipse-temurin:17-jdk as BUILDER
+FROM eclipse-temurin:25-jdk AS builder
 
 WORKDIR /app
 
@@ -23,7 +23,7 @@ RUN --mount=type=cache,target=/root/.gradle \
     ./gradlew bootJar -x test --no-daemon
 
 # -----| 실행 스테이지 |----- #
-FROM eclipse-temurin:17-jre
-COPY --from=BUILDER /app/build/libs/*-SNAPSHOT.jar /app/app.jar
+FROM eclipse-temurin:25-jre
+COPY --from=builder /app/build/libs/*-SNAPSHOT.jar /app/app.jar
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
