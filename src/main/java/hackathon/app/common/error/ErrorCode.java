@@ -27,7 +27,11 @@ public enum ErrorCode {
     INVALID_SCHEDULE_PERIOD(HttpStatus.UNPROCESSABLE_ENTITY, "시작일은 종료일보다 늦을 수 없습니다."),
     DATE_OUTSIDE_SCHEDULE_PERIOD(HttpStatus.UNPROCESSABLE_ENTITY, "작업 날짜가 스케줄 기간 밖입니다."),
     MAX_DAILY_TASKS_EXCEEDED(HttpStatus.UNPROCESSABLE_ENTITY, "하루 최대 작업 수를 초과했습니다."),
-    ITEMS_OUTSIDE_SCHEDULE_PERIOD(HttpStatus.CONFLICT, "변경하려는 기간 밖에 작업이 존재합니다.");
+    ITEMS_OUTSIDE_SCHEDULE_PERIOD(HttpStatus.CONFLICT, "변경하려는 기간 밖에 작업이 존재합니다."),
+
+    // ===== 7. 퍼즐 API =====
+    PUZZLE_NOT_FOUND(HttpStatus.NOT_FOUND, "퍼즐을 찾을 수 없습니다."),
+    PUZZLE_NOT_PUBLIC(HttpStatus.FORBIDDEN, "비공개 퍼즐입니다.");
 
     private final HttpStatus status;
     private final String message;

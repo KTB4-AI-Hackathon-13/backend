@@ -78,6 +78,7 @@ public class ScheduleItemService {
         schedule.increaseVersion();
         changeLogger.log(schedule.getId(), item.getId(), userId, ChangeAction.CREATE, ChangeSource.USER,
                 schedule.getCurrentVersion(), null, snapshot(item), null);
+        puzzlePieceAwarder.refreshOnItemsChanged(schedule);   // 조각 수가 늘어 퍼즐이 미완성으로 돌아갈 수 있다
 
         return ScheduleItemResponse.from(item);
     }
@@ -117,9 +118,14 @@ public class ScheduleItemService {
 
         item.changeStatus(newStatus, now);
 
-        PuzzlePieceAwarder.AwardResult award = newStatus == ScheduleItemStatus.COMPLETED
-                ? puzzlePieceAwarder.awardOnComplete(item)
-                : PuzzlePieceAwarder.AwardResult.none();
+        PuzzlePieceAwarder.AwardResult award;
+        if (newStatus == ScheduleItemStatus.COMPLETED) {
+            award = puzzlePieceAwarder.awardOnComplete(item);
+        } else {
+            award = PuzzlePieceAwarder.AwardResult.none();
+            // CANCELLED 로 바뀌면 유효한 작업 수가 줄어 퍼즐이 완성될 수 있다
+            puzzlePieceAwarder.refreshOnItemsChanged(item.getSchedule());
+        }
 
         return ScheduleItemStatusResponse.of(item, award);
     }
@@ -137,6 +143,7 @@ public class ScheduleItemService {
         schedule.increaseVersion();
         changeLogger.log(schedule.getId(), item.getId(), userId, ChangeAction.DELETE, ChangeSource.USER,
                 schedule.getCurrentVersion(), before, Map.of("deletedAt", now.toString()), null);
+        puzzlePieceAwarder.refreshOnItemsChanged(schedule);   // 조각 수가 줄어 퍼즐이 완성될 수 있다
     }
 
     // ===== 내부 헬퍼 =====

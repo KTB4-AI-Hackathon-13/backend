@@ -1,0 +1,1200 @@
+{
+  "info": {
+    "_postman_id": "4d465ced-be39-498a-84cc-fd4a4bbfa2f1",
+    "name": "AI Hackathon - 7. 퍼즐 API (MVP)",
+    "description": "설계서 7번 퍼즐 API(MVP) + 작업 완료 시 조각 지급 연결 테스트.\n\n사전 준비\n1. `mysql ... < docs/migration/2026-08-19_schedule_items_add_position.sql` (최초 1회)\n2. `mysql ... < docs/test-data/seed_schedule.sql`\n3. `mysql ... -e \"DELETE FROM puzzle_pieces; DELETE FROM puzzles;\"` (퍼즐 초기화)\n4. `.env` 에 APP_AUTH_DEV_HEADER_ENABLED=true 후 `./gradlew bootRun`\n\n규칙: 스케줄 1개 = 퍼즐 1개(첫 작업 완료 시 자동 생성). 작업 1건 = 조각 1개, 중복 지급 없음(정책4). position 은 획득 순서(0부터). 유효한 작업(삭제·CANCELLED 제외) 전부 조각을 모으면 COMPLETED, 작업이 추가되면 다시 IN_PROGRESS.\n\n순서대로 Run 하세요 (앞 요청 결과에 의존).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080/api/v1"
+    },
+    {
+      "key": "userId",
+      "value": "1"
+    },
+    {
+      "key": "puzzleId",
+      "value": ""
+    },
+    {
+      "key": "newItemId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. 조각 지급 연결 (작업 완료 → 퍼즐)",
+      "item": [
+        {
+          "name": "퍼즐 없음 확인",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "로컬 테스트용 헤더 폴백 (APP_AUTH_DEV_HEADER_ENABLED=true)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/puzzles/mine",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "puzzles",
+                "mine"
+              ]
+            },
+            "description": "퍼즐 초기화 직후라 비어 있어야 함"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"비어 있음\", () => pm.expect(pm.response.json().data.items).to.be.an(\"array\").that.is.empty);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "작업 1302 완료 → 퍼즐 자동 생성 + 조각 1개",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "로컬 테스트용 헤더 폴백 (APP_AUTH_DEV_HEADER_ENABLED=true)"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedule-items/1302/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedule-items",
+                "1302",
+                "status"
+              ]
+            },
+            "description": "스케줄 104(운동 루틴)의 첫 완료. 퍼즐이 없으면 이때 만들어진다.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"COMPLETED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const d=pm.response.json().data;",
+                  "pm.test(\"조각 지급됨\", () => { pm.expect(d.puzzlePieceAwarded).to.be.true; pm.expect(d.puzzlePieceId).to.be.a(\"number\"); });",
+                  "pm.collectionVariables.set(\"firstPieceId\", d.puzzlePieceId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "내 퍼즐 목록 (1/3)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "로컬 테스트용 헤더 폴백 (APP_AUTH_DEV_HEADER_ENABLED=true)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/puzzles/mine",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "puzzles",
+                "mine"
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const d=pm.response.json().data;",
+                  "pm.test(\"퍼즐 1개, 진행률 1/3\", () => { pm.expect(d.items.length).to.eql(1); pm.expect(d.items[0].earnedPieceCount).to.eql(1); pm.expect(d.items[0].pieceCount).to.eql(3); });",
+                  "pm.test(\"IN_PROGRESS, 제목 = 스케줄 제목\", () => { pm.expect(d.items[0].status).to.eql(\"IN_PROGRESS\"); pm.expect(d.items[0].title).to.eql(\"운동 루틴\"); });",
+                  "pm.collectionVariables.set(\"puzzleId\", d.items[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "같은 작업 다시 완료 → 중복 지급 없음 (정책4)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "로컬 테스트용 헤더 폴백 (APP_AUTH_DEV_HEADER_ENABLED=true)"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedule-items/1302/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedule-items",
+                "1302",
+                "status"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"COMPLETED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const d=pm.response.json().data;",
+                  "pm.test(\"awarded=false, 같은 조각 id\", () => { pm.expect(d.puzzlePieceAwarded).to.be.false; pm.expect(d.puzzlePieceId).to.eql(pm.collectionVariables.get(\"firstPieceId\")); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "완료 → TODO 되돌림 (조각 회수 안 함)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "로컬 테스트용 헤더 폴백 (APP_AUTH_DEV_HEADER_ENABLED=true)"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedule-items/1302/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedule-items",
+                "1302",
+                "status"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"TODO\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "다시 완료 → 여전히 awarded=false",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "로컬 테스트용 헤더 폴백 (APP_AUTH_DEV_HEADER_ENABLED=true)"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedule-items/1302/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedule-items",
+                "1302",
+                "status"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"COMPLETED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"중복 지급 없음\", () => pm.expect(pm.response.json().data.puzzlePieceAwarded).to.be.false);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "남은 작업 1301 완료",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "로컬 테스트용 헤더 폴백 (APP_AUTH_DEV_HEADER_ENABLED=true)"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedule-items/1301/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedule-items",
+                "1301",
+                "status"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"COMPLETED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"지급됨\", () => pm.expect(pm.response.json().data.puzzlePieceAwarded).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "마지막 작업 1303 완료 → 퍼즐 완성",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "로컬 테스트용 헤더 폴백 (APP_AUTH_DEV_HEADER_ENABLED=true)"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedule-items/1303/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedule-items",
+                "1303",
+                "status"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"COMPLETED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "완성 확인 (3/3, COMPLETED)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "로컬 테스트용 헤더 폴백 (APP_AUTH_DEV_HEADER_ENABLED=true)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/puzzles/{{puzzleId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "puzzles",
+                "{{puzzleId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const d=pm.response.json().data;",
+                  "pm.test(\"COMPLETED + completedAt\", () => { pm.expect(d.status).to.eql(\"COMPLETED\"); pm.expect(d.completedAt).to.be.a(\"string\"); });",
+                  "pm.test(\"3/3\", () => { pm.expect(d.earnedPieceCount).to.eql(3); pm.expect(d.pieceCount).to.eql(3); });",
+                  "pm.test(\"position 은 획득 순서 0,1,2\", () => { const ps=d.pieces.filter(p=>p.earned).map(p=>p.position).sort(); pm.expect(ps).to.eql([0,1,2]); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. 칸 수가 바뀔 때 완성 상태",
+      "item": [
+        {
+          "name": "작업 추가 → 다시 IN_PROGRESS (3/4)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "로컬 테스트용 헤더 폴백 (APP_AUTH_DEV_HEADER_ENABLED=true)"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedules/104/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedules",
+                "104",
+                "items"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"스트레칭\",\n  \"scheduledDate\": \"2026-08-25\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"newItemId\", pm.response.json().data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "확인: IN_PROGRESS 3/4",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "로컬 테스트용 헤더 폴백 (APP_AUTH_DEV_HEADER_ENABLED=true)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/puzzles/{{puzzleId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "puzzles",
+                "{{puzzleId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const d=pm.response.json().data;",
+                  "pm.test(\"IN_PROGRESS 로 복귀, completedAt 초기화\", () => { pm.expect(d.status).to.eql(\"IN_PROGRESS\"); pm.expect(d.completedAt).to.be.null; });",
+                  "pm.test(\"3/4\", () => { pm.expect(d.earnedPieceCount).to.eql(3); pm.expect(d.pieceCount).to.eql(4); });",
+                  "pm.test(\"못 받은 칸이 보인다\", () => pm.expect(d.pieces.filter(p=>!p.earned).length).to.eql(1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "추가한 작업 CANCELLED → 칸에서 빠져 다시 COMPLETED",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "로컬 테스트용 헤더 폴백 (APP_AUTH_DEV_HEADER_ENABLED=true)"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedule-items/{{newItemId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedule-items",
+                "{{newItemId}}",
+                "status"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"CANCELLED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "확인: COMPLETED 3/3",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "로컬 테스트용 헤더 폴백 (APP_AUTH_DEV_HEADER_ENABLED=true)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/puzzles/{{puzzleId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "puzzles",
+                "{{puzzleId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const d=pm.response.json().data;",
+                  "pm.test(\"COMPLETED 3/3\", () => { pm.expect(d.status).to.eql(\"COMPLETED\"); pm.expect(d.earnedPieceCount).to.eql(3); pm.expect(d.pieceCount).to.eql(3); });",
+                  "pm.test(\"획득 수가 전체를 넘지 않는다\", () => pm.expect(d.earnedPieceCount).to.be.at.most(d.pieceCount));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "추가한 작업 삭제",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "로컬 테스트용 헤더 폴백 (APP_AUTH_DEV_HEADER_ENABLED=true)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedule-items/{{newItemId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedule-items",
+                "{{newItemId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "확인: 여전히 COMPLETED 3/3",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "로컬 테스트용 헤더 폴백 (APP_AUTH_DEV_HEADER_ENABLED=true)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/puzzles/{{puzzleId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "puzzles",
+                "{{puzzleId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const d=pm.response.json().data;",
+                  "pm.test(\"COMPLETED 3/3\", () => { pm.expect(d.status).to.eql(\"COMPLETED\"); pm.expect(d.pieceCount).to.eql(3); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. 조회 API",
+      "item": [
+        {
+          "name": "내 퍼즐 목록 - status=COMPLETED",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "로컬 테스트용 헤더 폴백 (APP_AUTH_DEV_HEADER_ENABLED=true)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/puzzles/mine?status=COMPLETED",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "puzzles",
+                "mine"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "COMPLETED"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"완성 퍼즐만\", () => pm.response.json().data.items.forEach(i => pm.expect(i.status).to.eql(\"COMPLETED\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "내 퍼즐 목록 - size=1 (커서)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "로컬 테스트용 헤더 폴백 (APP_AUTH_DEV_HEADER_ENABLED=true)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/puzzles/mine?size=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "puzzles",
+                "mine"
+              ],
+              "query": [
+                {
+                  "key": "size",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const d=pm.response.json().data;",
+                  "pm.test(\"1건 + 커서 구조\", () => { pm.expect(d.items.length).to.be.at.most(1); pm.expect(d).to.have.keys(\"items\",\"nextCursor\",\"hasNext\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "퍼즐 상세 - 조각별 획득 상태",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "로컬 테스트용 헤더 폴백 (APP_AUTH_DEV_HEADER_ENABLED=true)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/puzzles/{{puzzleId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "puzzles",
+                "{{puzzleId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const d=pm.response.json().data;",
+                  "pm.test(\"필드\", () => pm.expect(d).to.include.keys(\"id\",\"scheduleId\",\"title\",\"status\",\"visibility\",\"imageId\",\"pieceCount\",\"earnedPieceCount\",\"completedAt\",\"pieces\"));",
+                  "pm.test(\"조각 필드\", () => pm.expect(d.pieces[0]).to.have.keys(\"pieceId\",\"scheduleItemId\",\"scheduleItemTitle\",\"scheduledDate\",\"earned\",\"position\",\"earnedAt\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "사용자 공개 퍼즐 (인증 없이도 조회)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/1/public-puzzles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "1",
+                "public-puzzles"
+              ]
+            },
+            "description": "공개(PUBLIC) + 완성(COMPLETED) 퍼즐만 나온다"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"공개·완성만\", () => pm.response.json().data.items.forEach(i => { pm.expect(i.status).to.eql(\"COMPLETED\"); pm.expect(i.visibility).to.eql(\"PUBLIC\"); }));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "타인이 내 완성·공개 퍼즐 상세 조회 → 200",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "2",
+                "description": "로컬 테스트용 헤더 폴백 (APP_AUTH_DEV_HEADER_ENABLED=true)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/puzzles/{{puzzleId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "puzzles",
+                "{{puzzleId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. 오류",
+      "item": [
+        {
+          "name": "[404] 없는 퍼즐",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "로컬 테스트용 헤더 폴백 (APP_AUTH_DEV_HEADER_ENABLED=true)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/puzzles/999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "puzzles",
+                "999999"
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"code == PUZZLE_NOT_FOUND\", () => pm.expect(pm.response.json().code).to.eql(\"PUZZLE_NOT_FOUND\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[401] 인증 없음",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/puzzles/mine",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "puzzles",
+                "mine"
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"code == AUTHENTICATION_REQUIRED\", () => pm.expect(pm.response.json().code).to.eql(\"AUTHENTICATION_REQUIRED\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[400] size=0",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "로컬 테스트용 헤더 폴백 (APP_AUTH_DEV_HEADER_ENABLED=true)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/puzzles/mine?size=0",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "puzzles",
+                "mine"
+              ],
+              "query": [
+                {
+                  "key": "size",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"fieldErrors.size\", () => pm.expect(pm.response.json().fieldErrors[0].field).to.eql(\"size\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[400] 잘못된 status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "로컬 테스트용 헤더 폴백 (APP_AUTH_DEV_HEADER_ENABLED=true)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/puzzles/mine?status=DONE",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "puzzles",
+                "mine"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "DONE"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code == INVALID_REQUEST\", () => pm.expect(pm.response.json().code).to.eql(\"INVALID_REQUEST\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[403] 타인의 미완성 퍼즐 (스케줄 101 작업 1004 완료로 생성)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}",
+                "description": "로컬 테스트용 헤더 폴백 (APP_AUTH_DEV_HEADER_ENABLED=true)"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedule-items/1004/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedule-items",
+                "1004",
+                "status"
+              ]
+            },
+            "description": "이 요청으로 스케줄 101 의 미완성 퍼즐이 생긴다. 다음 요청에서 user2 가 접근 → 403",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"COMPLETED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[403] user2 가 위 미완성 퍼즐 조회",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "1",
+                "description": "로컬 테스트용 헤더 폴백 (APP_AUTH_DEV_HEADER_ENABLED=true)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/puzzles/mine",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "puzzles",
+                "mine"
+              ]
+            },
+            "description": "퍼즐 id 를 얻어 다음 스텝에서 사용"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const p=pm.response.json().data.items.find(i=>i.scheduleId===101);",
+                  "pm.test(\"101 퍼즐 존재\", () => pm.expect(p).to.not.be.undefined);",
+                  "if (p) pm.collectionVariables.set(\"incompletePuzzleId\", p.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[403] 확인",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "2",
+                "description": "로컬 테스트용 헤더 폴백 (APP_AUTH_DEV_HEADER_ENABLED=true)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/puzzles/{{incompletePuzzleId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "puzzles",
+                "{{incompletePuzzleId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"code == PUZZLE_NOT_PUBLIC\", () => pm.expect(pm.response.json().code).to.eql(\"PUZZLE_NOT_PUBLIC\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

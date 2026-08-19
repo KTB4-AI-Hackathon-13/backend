@@ -1,4 +1,4 @@
-# 5. 스케줄 API · 6. 작업 API — 로컬 테스트 가이드
+# 5. 스케줄 API · 6. 작업 API · 7. 퍼즐 API — 로컬 테스트 가이드
 
 ## 1. 사전 준비
 
@@ -27,6 +27,7 @@ ENV
 컬렉션 파일 2개 (둘 다 같은 seed 사용, 각각 독립 실행 가능):
 - `docs/postman/schedule-api.postman_collection.json` — 5번 스케줄 API (33 요청)
 - `docs/postman/schedule-item-api.postman_collection.json` — 6번 작업 API (32 요청)
+- `docs/postman/puzzle-api.postman_collection.json` — 7번 퍼즐 API + 조각 지급 연결 (27 요청). **실행 전 퍼즐 초기화**: `mysql ... -e "DELETE FROM puzzle_pieces; DELETE FROM puzzles;"`
 
 1. Postman → **Import** → 위 파일
 2. 컬렉션 변수 확인 (컬렉션 클릭 → Variables 탭)
@@ -79,6 +80,9 @@ CLI 로 돌리려면: `npx newman run docs/postman/schedule-api.postman_collecti
 | PATCH | `/schedule-items/{id}` | 200 수정된 작업 (날짜 변경 시 기간·한도 재검사, 상태는 불가) | 422 / 400 / 404 SCHEDULE_ITEM_NOT_FOUND / 403 |
 | PATCH | `/schedule-items/{id}/status` | 200 `{itemId,status,completedAt,puzzlePieceAwarded,puzzlePieceId}` | 400 / 404 / 403 |
 | DELETE | `/schedule-items/{id}` | 204 (소프트 삭제) | 404 / 403 |
+| GET | `/puzzles/mine?status&size&cursor` | 200 내 퍼즐 목록 (진행률 `earnedPieceCount/pieceCount`) | 400 / 401 |
+| GET | `/puzzles/{puzzleId}` | 200 퍼즐 + 조각별 획득 상태 `pieces[]` | 404 PUZZLE_NOT_FOUND / 403 PUZZLE_NOT_PUBLIC |
+| GET | `/users/{userId}/public-puzzles` | 200 공개·완성 퍼즐 목록 (인증 선택) | 400 |
 
 모든 엔드포인트: 인증 없으면 401 `AUTHENTICATION_REQUIRED`. 모든 응답에 `X-Request-Id` 헤더 + `meta.requestId`(성공) / `requestId`(실패).
 
@@ -109,7 +113,23 @@ CLI 로 돌리려면: `npx newman run docs/postman/schedule-api.postman_collecti
 | 작업 날짜 | 스케줄 기간(`startDate`~`endDate`) 안 | 422 DATE_OUTSIDE_SCHEDULE_PERIOD |
 | `position` 기본값 | 미지정 시 같은 스케줄·같은 날짜의 `max(position)+1` (맨 뒤) | |
 | 상태 변경 | `completedAt` 은 COMPLETED 첫 진입 시 기록, 다른 상태로 가면 null. 다시 COMPLETED 되면 새로 기록 | 상태 변경은 change log·버전에 남기지 않음 |
-| 퍼즐 조각 지급 | **`PuzzlePieceAwarder` 포트**만 두고 임시 구현 `NoOpPuzzlePieceAwarder`(항상 awarded=false) | 7번 담당자가 `puzzles`/`puzzle_pieces` 저장 구현체를 만들어 교체(`@Primary` 또는 NoOp 제거). 중복 지급 방지(`schedule_item_id` UNIQUE)는 구현체 책임 |
+| 퍼즐 조각 지급 | `PuzzlePieceAwarder` 포트 ← **`PuzzlePieceAwardService`(7번 퍼즐 도메인)** 가 실제 지급 | 아래 7번 규칙 참고 |
 | 카테고리 | `categoryId` 지정 시 `categories.is_active = TRUE` 행이 있어야 함 — `CategoryChecker` | 없으면 400 INVALID_REQUEST |
 | 변경 이력·버전 | 추가(CREATE)/수정(UPDATE)/삭제(DELETE) 마다 `schedule_change_logs` 기록 + `schedules.current_version` +1 | 설계서는 수정만 명시했지만 핵심 정책 6(이력 보존)에 따라 전부 기록 |
 | 타인 작업 | 403 FORBIDDEN; 없음/삭제됨/스케줄 삭제됨 → 404 SCHEDULE_ITEM_NOT_FOUND | |
+
+### 7번 퍼즐 API 규칙 (2026-08-19 합의)
+
+| 항목 | 확정 | 비고 |
+|---|---|---|
+| 퍼즐 생성 | 스케줄 1개 = 퍼즐 1개. **스케줄의 작업을 처음 완료할 때 자동 생성** | 제목 = 스케줄 제목, `visibility=PUBLIC`, `image_id`는 이미지 도메인(8번) 전까지 null |
+| 조각 | 작업 1건 = 조각 1개. `puzzle_pieces.schedule_item_id` UNIQUE 로 중복 지급 차단(정책4) | 완료 → 다른 상태 → 다시 완료 해도 `puzzlePieceAwarded=false`, 조각은 회수하지 않음 |
+| `position` | **획득한 순서(0부터)** | 먼저 완료한 작업이 첫 칸 |
+| 완성 판정 | 유효한 작업(삭제·CANCELLED 제외) 전부가 조각을 가지면 `COMPLETED` | 작업이 추가되면 다시 `IN_PROGRESS`(+`completedAt` 초기화), 취소·삭제로 칸이 줄면 다시 `COMPLETED` |
+| 진행률 | `earnedPieceCount / pieceCount` — 둘 다 **유효한 작업 기준** | 삭제·취소된 작업의 조각은 칸과 함께 빠져서 획득 수가 전체를 넘지 않음 |
+| 상세 `pieces[]` | 유효한 작업 전부(= 퍼즐 칸 전부). 못 받은 칸은 `earned=false`, `pieceId`·`position`·`earnedAt` 은 null | |
+| 퍼즐 조회 권한 | 본인 퍼즐은 항상 조회. 타인 퍼즐은 **공개(PUBLIC)+완성(COMPLETED)** 만, 아니면 403 `PUZZLE_NOT_PUBLIC` | `/users/{userId}/public-puzzles` 는 인증 선택 |
+| 갱신 시점 | 작업 완료 시 지급, **작업 추가·삭제·상태변경 시 완성 여부 재계산**(`refreshOnItemsChanged`) | |
+| 2차 범위 | 공개 범위 변경, 갤러리, 좋아요는 미구현 (`puzzle_likes` 미사용) | |
+
+> 참고: 5번의 `completedPuzzleCount`(현재 COMPLETED 인 작업 수)와 퍼즐의 `earnedPieceCount`(획득 조각 수)는 다를 수 있다. 완료한 작업을 TODO 로 되돌려도 조각은 회수하지 않기 때문(정책4).

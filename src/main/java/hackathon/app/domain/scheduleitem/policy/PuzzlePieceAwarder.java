@@ -1,5 +1,6 @@
 package hackathon.app.domain.scheduleitem.policy;
 
+import hackathon.app.domain.schedule.entity.Schedule;
 import hackathon.app.domain.scheduleitem.entity.ScheduleItem;
 
 /**
@@ -8,10 +9,9 @@ import hackathon.app.domain.scheduleitem.entity.ScheduleItem;
  * 계약:
  * - 같은 작업에 대해 여러 번 호출되어도 조각은 최대 1개만 만들어져야 한다 (핵심 정책 4).
  *   → puzzle_pieces.schedule_item_id UNIQUE 로 보장하고, 이미 있으면 awarded=false 로 반환.
- * - 스케줄에 퍼즐이 아직 없으면 만들지 말지는 구현체(7번 퍼즐 도메인)가 결정한다.
+ * - 스케줄에 퍼즐이 없으면 구현체가 만든다 (스케줄 1개 = 퍼즐 1개).
  *
- * 현재는 {@link NoOpPuzzlePieceAwarder} (항상 미지급). 7번 담당자가 구현체를 만들면 그 빈에 @Primary 를 붙이거나
- * NoOp 구현을 제거한다.
+ * 구현: hackathon.app.domain.puzzle.service.PuzzlePieceAwardService (7번 퍼즐 도메인).
  */
 public interface PuzzlePieceAwarder {
 
@@ -23,4 +23,10 @@ public interface PuzzlePieceAwarder {
     }
 
     AwardResult awardOnComplete(ScheduleItem item);
+
+    /**
+     * 스케줄의 유효한 작업 구성이 바뀌었을 때(작업 추가·삭제·취소 등) 퍼즐 완성 여부를 다시 계산한다.
+     * 퍼즐이 아직 없으면 아무것도 하지 않는다.
+     */
+    void refreshOnItemsChanged(Schedule schedule);
 }

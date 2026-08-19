@@ -1,6 +1,6 @@
-# 프론트엔드 핸드오프 — 스케줄(5번) · 작업(6번) API
+# 프론트엔드 핸드오프 — 스케줄(5번) · 작업(6번) · 퍼즐(7번) API
 
-> 백엔드 담당자(김민서)가 구현한 **5. 스케줄 API / 6. 작업 API** 를 프론트에서 바로 연동할 수 있도록 정리한 문서입니다.
+> 백엔드 담당자(김민서)가 구현한 **5. 스케줄 API / 6. 작업 API / 7. 퍼즐 API(MVP)** 를 프론트에서 바로 연동할 수 있도록 정리한 문서입니다.
 > 기준일 2026-08-19. 설계서(노션 `API_SPECIFICATION_NOTION`)와 다르게 정한 것은 §8 "확정 규칙"에 모아두었습니다.
 > 다른 도메인(회원·인증, AI 대화/생성, 퍼즐, 이미지, 랭킹…)은 다른 팀원 담당이며 이 문서 범위 밖입니다.
 
@@ -53,7 +53,8 @@
 | 400 `INVALID_CURSOR` | 커서 깨짐 | 첫 페이지부터 다시 |
 | 401 `AUTHENTICATION_REQUIRED` | 세션 없음/만료 | 로그인 화면 |
 | 403 `FORBIDDEN` | 남의 스케줄/작업 | "권한 없음" |
-| 404 `SCHEDULE_NOT_FOUND` / `SCHEDULE_ITEM_NOT_FOUND` | 없음 또는 삭제됨 | 목록으로 |
+| 404 `SCHEDULE_NOT_FOUND` / `SCHEDULE_ITEM_NOT_FOUND` / `PUZZLE_NOT_FOUND` | 없음 또는 삭제됨 | 목록으로 |
+| 403 `PUZZLE_NOT_PUBLIC` | 타인의 비공개·미완성 퍼즐 | "비공개 퍼즐" |
 | 409 `ITEMS_OUTSIDE_SCHEDULE_PERIOD` | 기간 축소 시 범위 밖 작업 존재 | 메시지 표시 |
 | 422 `INVALID_SCHEDULE_PERIOD` | 시작일 > 종료일 | 폼 에러 |
 | 422 `DATE_OUTSIDE_SCHEDULE_PERIOD` | 작업 날짜가 스케줄 기간 밖 | 폼 에러 |
@@ -367,7 +368,7 @@ interface DailyItem {                   // 캘린더 / 오늘 할 일 항목 (�
 ### 5.3 상태 변경 `PATCH /schedule-items/{itemId}/status`
 - 본문: `{ "status": "COMPLETED" }` (ItemStatus 중 하나)
 - 응답은 설계서 "작업 완료 응답" 형식. `COMPLETED` 로 바꾸면 `completedAt` 이 찍히고 퍼즐 조각 지급 결과가 옴. 다른 상태로 돌리면 `completedAt: null`.
-- ⚠️ `puzzlePieceAwarded` 는 **퍼즐 도메인(7번) 구현 전까지 항상 `false`**, `puzzlePieceId: null`. UI 는 `true` 일 때 "조각 획득" 효과를 주도록 만들어 두면 됨.
+- `puzzlePieceAwarded: true` 면 이번 요청에서 퍼즐 조각을 새로 얻은 것 → "조각 획득" 연출. 같은 작업을 다시 완료하면 `false`(조각은 1개만).
 ```json
 {
   "data": {
@@ -385,6 +386,56 @@ interface DailyItem {                   // 캘린더 / 오늘 할 일 항목 (�
 
 ### 5.4 삭제 `DELETE /schedule-items/{itemId}` → `204`
 
+## 5-A. 퍼즐 API (7번, MVP)
+
+퍼즐 = 스케줄 1개당 1개. 작업 1건이 조각 1개이고, **그 스케줄의 작업을 처음 완료할 때 퍼즐이 자동으로 생긴다** (따로 만드는 API 없음).
+
+```ts
+type PuzzleStatus = 'IN_PROGRESS' | 'COMPLETED';
+
+interface PuzzleSummary {
+  id: number; scheduleId: number; title: string;      // 제목 = 스케줄 제목
+  status: PuzzleStatus; visibility: 'PUBLIC' | 'PRIVATE';
+  imageId: number | null;        // 퍼즐 그림 (이미지 도메인 전까지 null)
+  pieceCount: number;            // 전체 칸 수 = 유효한 작업 수
+  earnedPieceCount: number;      // 획득한 조각 수
+  completedAt: string | null;
+}
+interface PuzzleDetail extends PuzzleSummary {
+  pieces: {
+    pieceId: number | null; scheduleItemId: number; scheduleItemTitle: string;
+    scheduledDate: string; earned: boolean;
+    position: number | null;     // 획득 순서(0부터). 못 받았으면 null
+    earnedAt: string | null;
+  }[];
+}
+```
+
+### 5-A.1 내 퍼즐 목록 `GET /puzzles/mine?status=&size=&cursor=`
+`status?` `IN_PROGRESS`/`COMPLETED`, 커서 페이징(스케줄 목록과 동일 구조). 진행률은 `earnedPieceCount/pieceCount`.
+
+### 5-A.2 퍼즐 상세 `GET /puzzles/{puzzleId}`
+`pieces[]` 에 **퍼즐 칸이 전부** 들어온다 — 못 받은 칸은 `earned:false`. 그리드에 그대로 렌더링하면 됨.
+- 본인 퍼즐: 항상 조회 가능
+- 타인 퍼즐: 공개+완성된 것만, 아니면 `403 PUZZLE_NOT_PUBLIC` / 없으면 `404 PUZZLE_NOT_FOUND`
+
+### 5-A.3 사용자 공개 퍼즐 `GET /users/{userId}/public-puzzles?size=&cursor=`
+공개(PUBLIC) + 완성(COMPLETED) 퍼즐만. **인증 없이도 조회 가능**(비로그인 프로필 화면용).
+
+### 알아둘 동작
+| 상황 | 결과 |
+|---|---|
+| 작업 완료 | 조각 1개 지급 (`puzzlePieceAwarded:true`) |
+| 같은 작업 다시 완료 | 지급 안 함 (`false`) — 조각은 영구 1개 |
+| 완료 → TODO 되돌림 | **조각 유지** (회수 없음) |
+| 유효한 작업 전부 조각 획득 | 퍼즐 `COMPLETED` + `completedAt` |
+| 작업 추가 | 칸이 늘어 다시 `IN_PROGRESS` (`completedAt` null) |
+| 작업 취소/삭제 | 칸이 줄어 다시 `COMPLETED` 가 될 수 있음 |
+
+> 5번의 `completedPuzzleCount` 와 퍼즐의 `earnedPieceCount` 는 다를 수 있다(완료를 되돌려도 조각은 유지되므로). 퍼즐 화면은 퍼즐 API 숫자를 쓰면 됨.
+
+> 2차 예정(미구현): 공개 범위 변경, 공개 갤러리, 좋아요.
+
 ## 6. 화면 ↔ API 매핑 (참고)
 
 | 화면 | 호출 |
@@ -397,6 +448,9 @@ interface DailyItem {                   // 캘린더 / 오늘 할 일 항목 (�
 | 작업 추가 폼 | `POST /schedules/{id}/items` (날짜는 스케줄 기간 안으로 제한해서 보여주기) |
 | 작업 편집 | `PATCH /schedule-items/{id}` |
 | 작업 삭제 | `DELETE /schedule-items/{id}` |
+| 내 퍼즐 목록 / 진행률 | `GET /puzzles/mine` |
+| 퍼즐 상세(조각 그리드) | `GET /puzzles/{puzzleId}` |
+| 다른 사람 프로필의 공개 퍼즐 | `GET /users/{userId}/public-puzzles` |
 
 낙관적 업데이트 후 실패하면 `code` 별 메시지로 롤백. 상태 변경은 멱등(같은 상태로 다시 보내도 200).
 
@@ -436,4 +490,4 @@ Postman: `docs/postman/schedule-api.postman_collection.json`(5번 33요청), `do
 | 상태 변경 | `completedAt` 은 COMPLETED 첫 진입 시, 다른 상태로 가면 null. 변경 이력/버전에 남기지 않음 |
 | 추가/수정/삭제 | `currentVersion` +1 (프론트는 표시만) |
 | 인증 | 세션 쿠키 `SESSION` (`credentials: 'include'` 필수). 로컬 개발 한정 `X-User-Id` 폴백 |
-| 퍼즐 조각 | 7번 구현 전까지 `puzzlePieceAwarded=false` |
+| 퍼즐 | 스케줄당 1개, 첫 작업 완료 시 자동 생성. 조각 = 작업, position = 획득 순서. 회수 없음 |
