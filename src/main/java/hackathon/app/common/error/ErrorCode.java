@@ -13,6 +13,27 @@ public enum ErrorCode {
     AUTHENTICATION_REQUIRED(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다."),
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
     INVALID_TIMEZONE(HttpStatus.UNPROCESSABLE_ENTITY, "올바르지 않은 시간대입니다."),
+
+    // ===== 공통 =====
+    INVALID_REQUEST(HttpStatus.BAD_REQUEST, "잘못된 요청 형식입니다."),
+    INVALID_CURSOR(HttpStatus.BAD_REQUEST, "유효하지 않은 커서입니다."),
+    FORBIDDEN(HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
+    NOT_FOUND(HttpStatus.NOT_FOUND, "리소스를 찾을 수 없습니다."),
+    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다."),
+
+    // ===== 5. 스케줄 API / 6. 작업 API =====
+    SCHEDULE_NOT_FOUND(HttpStatus.NOT_FOUND, "스케줄을 찾을 수 없습니다."),
+    SCHEDULE_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "작업을 찾을 수 없습니다."),
+    INVALID_SCHEDULE_PERIOD(HttpStatus.UNPROCESSABLE_ENTITY, "시작일은 종료일보다 늦을 수 없습니다."),
+    DATE_OUTSIDE_SCHEDULE_PERIOD(HttpStatus.UNPROCESSABLE_ENTITY, "작업 날짜가 스케줄 기간 밖입니다."),
+    MAX_DAILY_TASKS_EXCEEDED(HttpStatus.UNPROCESSABLE_ENTITY, "하루 최대 작업 수를 초과했습니다."),
+    ITEMS_OUTSIDE_SCHEDULE_PERIOD(HttpStatus.CONFLICT, "변경하려는 기간 밖에 작업이 존재합니다."),
+
+    // ===== 7. 퍼즐 API =====
+    PUZZLE_NOT_FOUND(HttpStatus.NOT_FOUND, "퍼즐을 찾을 수 없습니다."),
+    PUZZLE_NOT_PUBLIC(HttpStatus.FORBIDDEN, "비공개 퍼즐입니다."),
+
+    // ===== 이미지 API =====
     IMAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "이미지를 찾을 수 없습니다."),
     IMAGE_ACCESS_DENIED(HttpStatus.FORBIDDEN, "이미지에 접근할 권한이 없습니다."),
     IMAGE_FILE_REQUIRED(HttpStatus.BAD_REQUEST, "이미지 파일이 필요합니다."),
