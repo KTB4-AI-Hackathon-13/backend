@@ -33,6 +33,12 @@ public enum ErrorCode {
     PUZZLE_NOT_FOUND(HttpStatus.NOT_FOUND, "퍼즐을 찾을 수 없습니다."),
     PUZZLE_NOT_PUBLIC(HttpStatus.FORBIDDEN, "비공개 퍼즐입니다."),
 
+    // ===== 대화 API =====
+    CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "대화방을 찾을 수 없습니다."),
+    MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "메시지를 찾을 수 없습니다."),
+    CONVERSATION_ARCHIVED(HttpStatus.CONFLICT, "보관된 대화방에는 메시지를 추가할 수 없습니다."),
+    INVALID_CONVERSATION_STATUS(HttpStatus.UNPROCESSABLE_ENTITY, "대화방은 ARCHIVED 상태로만 변경할 수 있습니다."),
+
     // ===== 이미지 API =====
     IMAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "이미지를 찾을 수 없습니다."),
     IMAGE_ACCESS_DENIED(HttpStatus.FORBIDDEN, "이미지에 접근할 권한이 없습니다."),
