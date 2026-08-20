@@ -30,6 +30,8 @@ app:
   auth:
     # true 면 세션 쿠키가 없을 때 X-User-Id 헤더로 사용자를 식별 (로컬 Postman 테스트용). 운영에서는 반드시 false
     dev-header-enabled: ${APP_AUTH_DEV_HEADER_ENABLED:false}
+    # 쿠키 secure 속성 제어. 운영은 true, 로컬 http 개발에서는 false 권장
+    cookie-secure: ${APP_AUTH_COOKIE_SECURE:true}
   storage:
     bucket: ${S3_BUCKET:}
     region: ${AWS_REGION:ap-northeast-2}

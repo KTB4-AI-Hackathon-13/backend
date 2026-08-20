@@ -3,6 +3,7 @@ package hackathon.app.user.presentation;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -15,9 +16,11 @@ import hackathon.app.user.domain.User;
 @RequestMapping("/api/v1/users")
 public class UserController {
     private final UserService service;
+    private final boolean cookieSecure;
 
-    public UserController(UserService service) {
+    public UserController(UserService service, @Value("${app.auth.cookie-secure:true}") boolean cookieSecure) {
         this.service = service;
+        this.cookieSecure = cookieSecure;
     }
 
     public record UserResponse(Long id, String email, String nickname, String profileImageUrl, String timezone) {
@@ -50,7 +53,7 @@ public class UserController {
 
     private void expireSessionCookie(HttpServletResponse response) {
         ResponseCookie cookie = ResponseCookie.from("SESSION", "")
-            .httpOnly(true).secure(true).sameSite("Lax").path("/").maxAge(0).build();
+            .httpOnly(true).secure(cookieSecure).sameSite("Lax").path("/").maxAge(0).build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 }
