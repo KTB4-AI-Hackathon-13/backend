@@ -20,6 +20,7 @@ public class AiPlanService {
     private final AiPlanClient aiPlanClient;
     private final ConversationRepository conversationRepository;
     private final AiPlanConversationRecorder conversationRecorder;
+    private final ConfirmedPlanPersistenceService confirmedPlanPersistenceService;
 
     public TemplateResponse generateTemplate(Long userId, GenerateTemplateRequest request) {
         validateConversation(userId, request.conversationId());
@@ -58,7 +59,7 @@ public class AiPlanService {
     public PlanTurnResponse revise(Long userId, String scheduleId, ReviseScheduleRequest request) {
         validateConversation(userId, request.conversationId());
         validateTemplateAnswers(request.templateAnswers());
-        if (request.currentPlan() == null || request.currentPlan().isNull()) {
+        if (request.currentPlan() == null) {
             throw new ApiException(ErrorCode.INVALID_REQUEST, "currentPlan은 필수입니다.");
         }
         PlanTurnResponse response = validatePlanTurn(aiPlanClient.revise(new AiRevisePayload(
@@ -66,6 +67,11 @@ public class AiPlanService {
                 request.templateAnswers(), request.currentPlan(), request.userMessage(),
                 request.feedbackHistory() == null ? List.of() : request.feedbackHistory(),
                 emptyIfNull(request.busyDates()))));
+        if (response.confirmed()) {
+            Long savedScheduleId = confirmedPlanPersistenceService.save(
+                    userId, request.conversationId(), request.goalSummary(), response.plan());
+            response = response.withSavedScheduleId(savedScheduleId);
+        }
         conversationRecorder.append(userId, request.conversationId(), request.userMessage(), response,
                 response.confirmed() ? AiPlanConversationRecorder.PLAN_CONFIRMED
                         : AiPlanConversationRecorder.PLAN_TURN);
@@ -101,7 +107,7 @@ public class AiPlanService {
 
     private PlanTurnResponse validatePlanTurn(PlanTurnResponse response) {
         if (response.assistant_message() == null || response.assistant_message().isBlank()
-                || response.plan() == null || response.plan().isNull()
+                || response.plan() == null
                 || response.feedback_history() == null) {
             throw new ApiException(ErrorCode.PLAN_INFORMATION_INCOMPLETE);
         }
