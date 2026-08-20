@@ -78,6 +78,10 @@ public class Puzzle extends BaseTimeEntity {
         return this.status == PuzzleStatus.COMPLETED;
     }
 
+    public void changeVisibility(PuzzleVisibility visibility) {
+        this.visibility = visibility;
+    }
+
     /**
      * 조각 수집 결과를 반영한다.
      * - 모든 조각을 모았으면 COMPLETED (completed_at 최초 1회만 기록)
