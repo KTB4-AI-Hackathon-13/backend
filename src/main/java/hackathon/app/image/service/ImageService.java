@@ -12,13 +12,13 @@ import javax.imageio.ImageIO;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import hackathon.app.auth.application.AuthService;
+import hackathon.app.auth.service.AuthService;
 import hackathon.app.common.error.ApiException;
 import hackathon.app.common.error.ErrorCode;
 import hackathon.app.image.entity.ImageOwnerType;
 import hackathon.app.image.entity.StoredImage;
 import hackathon.app.image.repository.StoredImageRepository;
-import hackathon.app.user.domain.User;
+import hackathon.app.user.entity.User;
 
 @Service
 @Transactional

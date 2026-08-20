@@ -1,9 +1,9 @@
 package hackathon.app.global.auth;
 
-import hackathon.app.auth.application.AuthService;
+import hackathon.app.auth.service.AuthService;
 import hackathon.app.common.error.ApiException;
 import hackathon.app.common.error.ErrorCode;
-import hackathon.app.user.domain.User;
+import hackathon.app.user.entity.User;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Arrays;

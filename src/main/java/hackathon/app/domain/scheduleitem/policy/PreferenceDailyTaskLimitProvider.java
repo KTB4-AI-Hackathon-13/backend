@@ -1,7 +1,7 @@
 package hackathon.app.domain.scheduleitem.policy;
 
-import hackathon.app.preference.domain.UserPreference;
-import hackathon.app.preference.domain.UserPreferenceRepository;
+import hackathon.app.preference.entity.UserPreference;
+import hackathon.app.preference.repository.UserPreferenceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
