@@ -27,8 +27,10 @@ public class ConversationPlanService {
     public ConversationTurnResponse turn(Long userId, String conversationId, MessageRequest request) {
         // 권한/상태는 먼저 확인하되, AI 호출이 성공하기 전에는 메시지를 DB에 남기지 않는다.
         Conversation conversation = conversationService.requireActive(userId, conversationId);
+        // AI의 schedule_id는 필수(str)라 null을 보내면 422가 난다.
+        // 계획 확정 전에는 스케줄이 아직 없으므로 빈 문자열로 보낸다.
         String requestedScheduleId = conversation.getScheduleId() == null
-                ? null
+                ? ""
                 : conversation.getScheduleId().toString();
         SchedulePlan currentPlan = remainingPlan(conversation, request.current_plan());
 
