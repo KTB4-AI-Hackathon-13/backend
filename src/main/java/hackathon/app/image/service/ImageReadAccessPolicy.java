@@ -31,7 +31,7 @@ public class ImageReadAccessPolicy {
         }
 
         Puzzle puzzle = puzzles.findById(puzzleId).orElseThrow(this::accessDenied);
-        if (puzzle.getDeletedAt() == null && puzzle.isCompleted() && puzzle.isPublic()) return;
+        if (puzzle.getDeletedAt() == null && puzzle.isCompleted()) return;
         throw accessDenied();
     }
 

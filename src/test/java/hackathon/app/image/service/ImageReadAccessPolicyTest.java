@@ -43,7 +43,7 @@ class ImageReadAccessPolicyTest {
     @Test
     void loggedInOtherUserCanReadPublicCompletedPuzzleImage() {
         StoredImage image = puzzleImage(String.valueOf(PUZZLE_ID));
-        Puzzle puzzle = puzzle(false, true, true);
+        Puzzle puzzle = puzzle(false, true);
         when(puzzles.findById(PUZZLE_ID)).thenReturn(Optional.of(puzzle));
 
         assertThatCode(() -> policy.check(image, OTHER_USER_ID)).doesNotThrowAnyException();
@@ -54,25 +54,25 @@ class ImageReadAccessPolicyTest {
         StoredImage image = mock(StoredImage.class);
         when(image.getOwnerType()).thenReturn(ImageOwnerType.PUZZLE);
         when(image.getOwnerId()).thenReturn(String.valueOf(PUZZLE_ID));
-        Puzzle puzzle = puzzle(false, true, true);
+        Puzzle puzzle = puzzle(false, true);
         when(puzzles.findById(PUZZLE_ID)).thenReturn(Optional.of(puzzle));
 
         assertThatCode(() -> policy.check(image, null)).doesNotThrowAnyException();
     }
 
     @Test
-    void otherUserCannotReadPrivatePuzzleImage() {
+    void otherUserCanReadPrivateCompletedPuzzleImage() {
         StoredImage image = puzzleImage(String.valueOf(PUZZLE_ID));
-        Puzzle puzzle = puzzle(false, true, false);
+        Puzzle puzzle = puzzle(false, true);
         when(puzzles.findById(PUZZLE_ID)).thenReturn(Optional.of(puzzle));
 
-        assertAccessDenied(() -> policy.check(image, OTHER_USER_ID));
+        assertThatCode(() -> policy.check(image, OTHER_USER_ID)).doesNotThrowAnyException();
     }
 
     @Test
     void otherUserCannotReadInProgressPuzzleImage() {
         StoredImage image = puzzleImage(String.valueOf(PUZZLE_ID));
-        Puzzle puzzle = puzzle(false, false, false);
+        Puzzle puzzle = puzzle(false, false);
         when(puzzles.findById(PUZZLE_ID)).thenReturn(Optional.of(puzzle));
 
         assertAccessDenied(() -> policy.check(image, OTHER_USER_ID));
@@ -81,7 +81,7 @@ class ImageReadAccessPolicyTest {
     @Test
     void otherUserCannotReadDeletedPuzzleImage() {
         StoredImage image = puzzleImage(String.valueOf(PUZZLE_ID));
-        Puzzle puzzle = puzzle(true, false, false);
+        Puzzle puzzle = puzzle(true, false);
         when(puzzles.findById(PUZZLE_ID)).thenReturn(Optional.of(puzzle));
 
         assertAccessDenied(() -> policy.check(image, OTHER_USER_ID));
@@ -121,13 +121,10 @@ class ImageReadAccessPolicyTest {
         return image;
     }
 
-    private Puzzle puzzle(boolean deleted, boolean completed, boolean visible) {
+    private Puzzle puzzle(boolean deleted, boolean completed) {
         Puzzle puzzle = mock(Puzzle.class);
         when(puzzle.getDeletedAt()).thenReturn(deleted ? LocalDateTime.now() : null);
-        if (!deleted) {
-            when(puzzle.isCompleted()).thenReturn(completed);
-            if (completed) when(puzzle.isPublic()).thenReturn(visible);
-        }
+        if (!deleted) when(puzzle.isCompleted()).thenReturn(completed);
         return puzzle;
     }
 
