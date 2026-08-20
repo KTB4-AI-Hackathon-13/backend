@@ -13,6 +13,8 @@ import java.util.Optional;
 public interface ConversationRepository extends JpaRepository<Conversation, String> {
     Optional<Conversation> findByIdAndOwnerUserIdAndDeletedAtIsNull(String id, Long ownerUserId);
 
+    Optional<Conversation> findByScheduleIdAndOwnerUserIdAndDeletedAtIsNull(Long scheduleId, Long ownerUserId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select c from Conversation c where c.id = :id and c.ownerUserId = :userId and c.deletedAt is null")
     Optional<Conversation> findOwnedForUpdate(@Param("id") String id, @Param("userId") Long userId);

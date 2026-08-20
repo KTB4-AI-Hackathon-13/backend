@@ -2,7 +2,6 @@ package hackathon.app.ai.plan.dto;
 
 import java.util.List;
 import java.util.Map;
-import tools.jackson.databind.JsonNode;
 
 public record AiRevisePayload(
         String conversation_id,
@@ -13,5 +12,5 @@ public record AiRevisePayload(
         SchedulePlan current_plan,
         String user_message,
         List<String> feedback_history,
-        List<JsonNode> busy_dates
+        List<BusyDatePayload> busy_dates
 ) {}

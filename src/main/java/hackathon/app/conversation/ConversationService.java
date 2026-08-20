@@ -1,6 +1,5 @@
 package hackathon.app.conversation;
 
-import hackathon.app.conversation.ai.*;
 import hackathon.app.conversation.domain.*;
 import hackathon.app.conversation.dto.response.*;
 import org.springframework.data.domain.PageRequest;
@@ -14,17 +13,13 @@ import java.util.*;
 public class ConversationService {
     private final ConversationRepository conversations;
     private final ConversationMessageRepository messages;
-    private final AiConversationClient ai;
     private final Clock clock;
-    private final tools.jackson.databind.ObjectMapper objectMapper;
 
     public ConversationService(ConversationRepository conversations, ConversationMessageRepository messages,
-            AiConversationClient ai, Clock clock, tools.jackson.databind.ObjectMapper objectMapper) {
+            Clock clock) {
         this.conversations = conversations;
         this.messages = messages;
-        this.ai = ai;
         this.clock = clock;
-        this.objectMapper = objectMapper;
     }
 
     @Transactional
@@ -40,6 +35,13 @@ public class ConversationService {
         return new CursorPageResponse<>(page.stream().map(ConversationResponse::from).toList(), next, hasNext);
     }
 
+    public ConversationResponse findBySchedule(Long userId, Long scheduleId) {
+        Conversation conversation = conversations
+                .findByScheduleIdAndOwnerUserIdAndDeletedAtIsNull(scheduleId, userId)
+                .orElseThrow(this::notFound);
+        return ConversationResponse.from(conversation);
+    }
+
     public MessageScrollResponse messages(Long userId, String conversationId, int size, Integer before) {
         owned(userId, conversationId);
         List<ConversationMessage> found = messages.findPage(conversationId, before, PageRequest.of(0, size + 1));
@@ -51,21 +53,49 @@ public class ConversationService {
         return new MessageScrollResponse(chronological, next, hasNext);
     }
 
-    @Transactional
-    public MessageExchangeResponse send(Long userId, String conversationId, String content) {
-        Conversation conversation = lockedActive(userId, conversationId);
-        return appendExchange(conversation, content, null, latestMessageId(conversationId));
+    /** 외부 AI를 호출하기 전에 대화 소유권과 활성 상태만 확인한다. 메시지는 아직 저장하지 않는다. */
+    public Conversation requireActive(Long userId, String conversationId) {
+        Conversation conversation = owned(userId, conversationId);
+        if (conversation.getStatus() == ConversationStatus.ARCHIVED) {
+            throw ConversationException.archived();
+        }
+        return conversation;
     }
 
     @Transactional
-    public MessageExchangeResponse revise(Long userId, String conversationId, String messageId, String content) {
+    public MessageResponse send(Long userId, String conversationId, String content) {
+        Conversation conversation = lockedActive(userId, conversationId);
+        return appendUser(conversation, content, null, latestMessageId(conversationId));
+    }
+
+    @Transactional
+    public MessageResponse appendAssistant(Long userId, String conversationId, String content) {
+        Conversation conversation = lockedActive(userId, conversationId);
+        int sequence = messages.findMaxSequenceNo(conversationId) + 1;
+        LocalDateTime createdAt = now();
+        ConversationMessage assistant = messages.save(ConversationMessage.create(
+                conversationId, latestMessageId(conversationId), sequence, MessageRole.ASSISTANT,
+                null, content, null, null, null, null, createdAt));
+        conversation.messageAdded(createdAt);
+        return MessageResponse.from(assistant);
+    }
+
+    @Transactional
+    public void rename(Long userId, String conversationId, String title) {
+        if (title == null || title.isBlank()) return;
+        Conversation conversation = lockedActive(userId, conversationId);
+        conversation.rename(title.substring(0, Math.min(title.length(), 200)), now());
+    }
+
+    @Transactional
+    public MessageResponse revise(Long userId, String conversationId, String messageId, String content) {
         Conversation conversation = lockedActive(userId, conversationId);
         ConversationMessage original = messages.findByIdAndConversationIdAndDeletedAtIsNull(messageId, conversationId)
                 .orElseThrow(ConversationException::messageNotFound);
         if (original.getRole() != MessageRole.USER) {
             throw ConversationException.messageNotFound();
         }
-        return appendExchange(conversation, content, original.getId(), original.getParentMessageId());
+        return appendUser(conversation, content, original.getId(), original.getParentMessageId());
     }
 
     @Transactional
@@ -79,31 +109,13 @@ public class ConversationService {
         return ConversationResponse.from(conversation);
     }
 
-    private MessageExchangeResponse appendExchange(Conversation conversation, String content, String replacesId, String parentId) {
+    private MessageResponse appendUser(Conversation conversation, String content, String replacesId, String parentId) {
         int sequence = messages.findMaxSequenceNo(conversation.getId()) + 1;
         LocalDateTime userTime = now();
         ConversationMessage userMessage = messages.save(ConversationMessage.create(conversation.getId(), parentId,
                 sequence, MessageRole.USER, null, content, replacesId, null, null, null, userTime));
-        AiConversationResult result = ai.reply(content);
-        LocalDateTime assistantTime = now();
-        String payloadJson = result.planDraft() == null ? null : objectMapper.writeValueAsString(result.planDraft());
-        MessageType messageType = payloadJson == null ? MessageType.TEXT : MessageType.PLAN_DRAFT;
-        ConversationMessage assistant = messages.save(ConversationMessage.create(conversation.getId(), userMessage.getId(),
-                sequence + 1, MessageRole.ASSISTANT, messageType, payloadJson,
-                result.action().type().name(), result.content(), null, result.modelName(),
-                result.tokenUsage().promptTokens(), result.tokenUsage().completionTokens(), assistantTime));
-        conversation.messageAdded(assistantTime);
-        return new MessageExchangeResponse(MessageResponse.from(userMessage), MessageResponse.from(assistant), readiness(content));
-    }
-
-    private PlanReadinessResponse readiness(String content) {
-        String normalized = content.toLowerCase(Locale.ROOT);
-        List<String> missing = new ArrayList<>();
-        boolean hasEndDate = normalized.matches(".*(\\d{4}[-./]\\d{1,2}[-./]\\d{1,2}|\\d{1,2}월|까지).*?");
-        boolean hasDays = normalized.matches(".*(월요일|화요일|수요일|목요일|금요일|토요일|일요일|평일|주말|매일).*?");
-        if (!hasEndDate) missing.add("END_DATE");
-        if (!hasDays) missing.add("AVAILABLE_DAYS");
-        return new PlanReadinessResponse(missing.isEmpty(), List.copyOf(missing));
+        conversation.messageAdded(userTime);
+        return MessageResponse.from(userMessage);
     }
 
     private String latestMessageId(String conversationId) {

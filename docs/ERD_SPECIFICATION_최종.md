@@ -351,11 +351,12 @@ AI나 사용자가 스케줄을 바꿨을 때 변경 전·후 상태를 보존�
 | `id` | BIGINT | Y | 일별 실적 ID, PK |
 | `user_id` | BIGINT | Y | 대상 회원, `users.id` FK |
 | `category_id` | BIGINT | N | 카테고리별 실적이면 `categories.id`, 전체 실적이면 `NULL` |
+| `category_key` | BIGINT | Y | `NULL` 카테고리 유니크 제약을 위한 `COALESCE(category_id, 0)` 생성 컬럼 |
 | `metric_date` | DATE | Y | 집계 기준일 |
 | `planned_item_count` | INT | Y | 해당 날짜에 계획된 작업 수 |
 | `completed_item_count` | INT | Y | 완료한 작업 수 |
-| `planned_minutes` | INT | Y | 계획된 시간(분). 현재 날짜 기반 정책과 맞지 않는 잔여 컬럼 |
-| `completed_minutes` | INT | Y | 완료한 시간(분). 현재 날짜 기반 정책과 맞지 않는 잔여 컬럼 |
+| `planned_minutes` | INT | Y | 해당 날 유효 작업의 `estimated_minutes` 합계 |
+| `completed_minutes` | INT | Y | 해당 날 완료 작업의 `estimated_minutes` 합계 |
 | `puzzle_count` | INT | Y | 완료 작업 수와 동일한 완료 퍼즐 수. 랭킹 조회를 위한 집계값 |
 | `achievement_rate` | DECIMAL(5,2) | Y | 달성률. 일반적으로 0.00~100.00 |
 | `consecutive_days` | INT | Y | 연속 달성 일수 |
@@ -368,7 +369,7 @@ AI나 사용자가 스케줄을 바꿨을 때 변경 전·후 상태를 보존�
 achievement_rate = completed_item_count / planned_item_count * 100
 ```
 
-현재 서비스가 시간을 사용하지 않으므로 `planned_minutes`, `completed_minutes`는 `planned_workload`, `completed_workload`로 변경하는 것을 권장한다.
+일별 계획·완료 시간은 `schedule_items.estimated_minutes`를 합산한다.
 
 ### 7.2 `ranking_snapshots` — 랭킹 결과
 
@@ -378,8 +379,11 @@ achievement_rate = completed_item_count / planned_item_count * 100
 |---|---|---:|---|
 | `id` | BIGINT | Y | 랭킹 결과 ID, PK |
 | `ranking_date` | DATE | Y | 랭킹 기준일 |
+| `ranking_type` | ENUM | Y | `STREAK`, `COMPLETED_PUZZLES`, `PUZZLE_PIECES` |
+| `period_type` | ENUM | Y | `DAILY`, `WEEKLY`, `MONTHLY`, `YEARLY`, `ALL` |
 | `scope` | ENUM | Y | `OVERALL`은 전체, `CATEGORY`는 카테고리별 랭킹 |
 | `category_id` | BIGINT | N | 카테고리 랭킹일 때 `categories.id`; 전체 랭킹은 `NULL` |
+| `category_key` | BIGINT | Y | `NULL` 카테고리 유니크 제약을 위한 `COALESCE(category_id, 0)` 생성 컬럼 |
 | `user_id` | BIGINT | Y | 랭킹 대상 회원, `users.id` FK |
 | `rank_no` | INT | Y | 해당 범위 내 순위 |
 | `score` | DECIMAL(14,2) | Y | 랭킹 계산에 사용한 최종 점수 |
@@ -497,7 +501,7 @@ score = 퍼즐 수 × 퍼즐 가중치 + 활동 일수 × 일수 가중치
 명세 작성 과정에서 현재 정책과 맞지 않는 다음 항목이 확인되었다.
 
 1. 대화 본문을 MySQL에 저장하므로 `conversation_messages.external_document_id`는 제거 가능하다.
-2. 시간 기반 스케줄링을 하지 않으므로 `user_daily_metrics.planned_minutes`와 `completed_minutes`를 각각 `planned_workload`, `completed_workload`로 바꾸는 것이 적절하다.
+2. `user_daily_metrics.planned_minutes`, `completed_minutes`는 작업의 `estimated_minutes`를 집계한다.
 3. 메시지 생성 시간이 같은 경우에도 순서를 보장하려면 `conversation_messages.sequence_no` 추가를 권장한다.
 4. 대화 수정 이후 분기 흐름까지 보존하려면 `parent_message_id` 또는 `branch_id` 추가를 권장한다.
 5. `achievement_rate`, `score`, `workload`의 계산·부여 규칙은 별도의 비즈니스 정책 문서로 확정해야 한다.

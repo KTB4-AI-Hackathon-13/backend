@@ -144,6 +144,8 @@ BE가 외부 AI 서버에 요청하고 응답을 기다린 뒤, 검증과 저장
 
 AI 응답의 `estimated_min`은 `schedule_items.estimated_minutes`, `summary`는 `schedules.description`에 저장한다. 외부 AI 설정은 `AI_BASE_URL`, `AI_CONNECT_TIMEOUT_SECONDS`, `AI_READ_TIMEOUT_SECONDS`를 사용한다.
 
+`/ai-generations`의 `busy_dates`는 FE 입력을 사용하지 않는다. BE가 `templateAnswers.start_date/end_date`를 파싱하고 로그인 `userId`의 해당 기간 `schedule_items`를 조회한다. 삭제 작업과 `CANCELLED`는 제외하며 날짜별 일정 개수를 `{"date":"YYYY-MM-DD","event_count":N}` 형식으로 AI `/plan/generate`에 전달한다.
+
 `/ai-revisions`에서 외부 AI 응답이 `confirmed: true`이면 응답 최상위 한글 `category`를 Java `CategoryType`으로 검증하고 영문 코드로 변환한다. 활성 `categories.code`가 같은 삭제되지 않은 이미지 중 하나를 무작위로 선택하고 `image_id`, 새 S3 서명 `image_url`, `image_url_expires_at`을 함께 반환한다. 지원 카테고리는 운동·다이어트·음악·공부·어학·커리어·습관·마인드셋·인간관계·취미이다.
 
 
@@ -332,8 +334,9 @@ WHERE schedule_id = :schedule_id
 
 | 기능 | Method | URL | 인증 | 주요 요청값 | 주요 응답값 | 연결 테이블 |
 |---|---|---|---:|---|---|---|
-| 랭킹 조회 | GET | `/rankings` | 선택 | `type`, `categoryId?`, `period?`, `size?` | 순위 목록, 내 순위 | `ranking_snapshots` |
-| 랭킹 사용자 퍼즐 | GET | `/users/{userId}/public-puzzles` | 선택 | `sort?`, `size?`, `cursor?` | 공개 완성 퍼즐 | 퍼즐 테이블 추가 필요 |
+| 랭킹 조회 | GET | `/rankings` | 선택 | `type`, `categoryId?`, `period?=ALL`, `size?` | 순위 목록, 내 순위 | `ranking_snapshots` |
+| 랭킹 사용자 퍼즐 | GET | `/users/{userId}/public-puzzles` | 선택 | `sort?`, `size?`, `cursor?` | 공개 완성 퍼즐 | `puzzles`, `puzzle_pieces` |
+| 활성 카테고리 | GET | `/categories` | 선택 | 없음 | 랭킹 범위 선택지 | `categories` |
 
 ### 랭킹 기준
 
@@ -342,6 +345,9 @@ WHERE schedule_id = :schedule_id
 | `STREAK` | 연속 실천 일수 |
 | `COMPLETED_PUZZLES` | 완성한 퍼즐 작품 수 |
 | `PUZZLE_PIECES` | 완료 작업으로 획득한 조각 수 |
+
+`period`는 `DAILY`, `WEEKLY`(월요일~기준일), `MONTHLY`, `YEARLY`, `ALL`을 지원한다.
+생략 시 `ALL`이며, `categoryId`가 없으면 전체, 있으면 해당 카테고리 랭킹이다.
 
 ### 랭킹 응답 필드
 
