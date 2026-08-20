@@ -29,10 +29,19 @@ public enum ErrorCode {
     DATE_OUTSIDE_SCHEDULE_PERIOD(HttpStatus.UNPROCESSABLE_ENTITY, "작업 날짜가 스케줄 기간 밖입니다."),
     MAX_DAILY_TASKS_EXCEEDED(HttpStatus.UNPROCESSABLE_ENTITY, "하루 최대 작업 수를 초과했습니다."),
     ITEMS_OUTSIDE_SCHEDULE_PERIOD(HttpStatus.CONFLICT, "변경하려는 기간 밖에 작업이 존재합니다."),
+    INVALID_ESTIMATED_MINUTES(HttpStatus.UNPROCESSABLE_ENTITY, "소요시간은 1~1440분이어야 합니다."),
+    INVALID_ITEM_TYPE(HttpStatus.UNPROCESSABLE_ENTITY, "정의되지 않은 작업 유형입니다."),
+    SCHEDULE_NOT_DRAFT(HttpStatus.CONFLICT, "DRAFT 상태의 스케줄만 확정할 수 있습니다."),
 
     // ===== 7. 퍼즐 API =====
     PUZZLE_NOT_FOUND(HttpStatus.NOT_FOUND, "퍼즐을 찾을 수 없습니다."),
     PUZZLE_NOT_PUBLIC(HttpStatus.FORBIDDEN, "비공개 퍼즐입니다."),
+    PUZZLE_NOT_COMPLETED(HttpStatus.UNPROCESSABLE_ENTITY, "완성된 퍼즐만 공개할 수 있습니다."),
+
+    // ===== AI 계획 생성 API =====
+    GENERATION_NOT_FOUND(HttpStatus.NOT_FOUND, "AI 생성 작업을 찾을 수 없습니다."),
+    GENERATION_ALREADY_RUNNING(HttpStatus.CONFLICT, "동일한 AI 생성 요청이 처리 중입니다."),
+    AI_GENERATION_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "AI 계획 생성에 실패했습니다."),
 
     // ===== 대화 API =====
     CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "대화방을 찾을 수 없습니다."),

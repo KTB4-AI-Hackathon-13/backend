@@ -14,6 +14,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
@@ -45,8 +46,9 @@ public class ScheduleItem extends BaseTimeEntity {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    /** categories.id (FK). 카테고리 엔티티와의 연관은 해당 도메인 확정 후 추가 */
-    @Column(name = "category_id")
+    /** 최신 스키마에서는 Schedule.categoryId를 사용한다. 이전 빌더 호출만 위한 비영속 호환 필드. */
+    @Transient
+    @Deprecated
     private Long categoryId;
 
     /** 상위 작업 schedule_items.id */
@@ -62,11 +64,17 @@ public class ScheduleItem extends BaseTimeEntity {
     @Column(name = "scheduled_date", nullable = false)
     private LocalDate scheduledDate;
 
-    @Column(name = "workload")
+    /** estimatedMinutes로 대체된 이전 빌더 호출 호환 필드. DB/API에는 저장·노출하지 않는다. */
+    @Transient
+    @Deprecated
     private Integer workload;
 
     @Column(name = "estimated_minutes", nullable = false)
     private Integer estimatedMinutes;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "item_type", nullable = false, length = 20)
+    private ScheduleItemType itemType;
 
     /** 1 highest, 5 lowest */
     @Column(name = "priority", nullable = false, columnDefinition = "tinyint")
@@ -92,7 +100,7 @@ public class ScheduleItem extends BaseTimeEntity {
 
     @Builder
     private ScheduleItem(Schedule schedule, Long userId, Long categoryId, Long parentItemId, String title, String description,
-                         LocalDate scheduledDate, Integer workload, Integer estimatedMinutes,
+                         LocalDate scheduledDate, Integer workload, Integer estimatedMinutes, ScheduleItemType itemType,
                          Integer priority, Integer position,
                          ChangeSource source) {
         this.schedule = schedule;
@@ -104,6 +112,7 @@ public class ScheduleItem extends BaseTimeEntity {
         this.scheduledDate = scheduledDate;
         this.workload = workload;
         this.estimatedMinutes = estimatedMinutes;
+        this.itemType = itemType != null ? itemType : ScheduleItemType.ETC;
         this.priority = priority != null ? priority : 3;
         this.position = position != null ? position : 0;
         this.status = ScheduleItemStatus.TODO;
@@ -123,8 +132,8 @@ public class ScheduleItem extends BaseTimeEntity {
     }
 
     /** 작업 내용 수정. null 인 값은 변경하지 않는다. (상태는 changeStatus 로만 변경) */
-    public void update(String title, String description, LocalDate scheduledDate, Long categoryId,
-                       Integer workload, Integer estimatedMinutes, Integer priority, Integer position) {
+    public void update(String title, String description, LocalDate scheduledDate,
+                       Integer estimatedMinutes, ScheduleItemType itemType, Integer priority, Integer position) {
         if (title != null) {
             this.title = title;
         }
@@ -134,14 +143,11 @@ public class ScheduleItem extends BaseTimeEntity {
         if (scheduledDate != null) {
             this.scheduledDate = scheduledDate;
         }
-        if (categoryId != null) {
-            this.categoryId = categoryId;
-        }
-        if (workload != null) {
-            this.workload = workload;
-        }
         if (estimatedMinutes != null) {
             this.estimatedMinutes = estimatedMinutes;
+        }
+        if (itemType != null) {
+            this.itemType = itemType;
         }
         if (priority != null) {
             this.priority = priority;
@@ -151,15 +157,28 @@ public class ScheduleItem extends BaseTimeEntity {
         }
     }
 
+    /** 이전 서비스/테스트 호출 호환용. 신규 코드에서는 사용하지 않는다. */
+    @Deprecated
+    public void update(String title, String description, LocalDate scheduledDate, Long categoryId,
+                       Integer workload, Integer estimatedMinutes, Integer priority, Integer position) {
+        update(title, description, scheduledDate, estimatedMinutes, null, priority, position);
+    }
+
     public boolean belongsToSchedule() { return schedule != null; }
 
     /** AI 계획 확정 결과를 적용한다. null 값은 기존 값을 유지한다. */
-    public void applyAiPlan(String title, String description, LocalDate scheduledDate, Integer estimatedMinutes) {
+    public void applyAiPlan(String title, String description, LocalDate scheduledDate,
+                            Integer estimatedMinutes, ScheduleItemType itemType) {
         if (title != null) this.title = title;
         if (description != null) this.description = description;
         if (scheduledDate != null) this.scheduledDate = scheduledDate;
         if (estimatedMinutes != null) this.estimatedMinutes = estimatedMinutes;
+        if (itemType != null) this.itemType = itemType;
         this.source = ChangeSource.AI;
+    }
+
+    public void applyAiPlan(String title, String description, LocalDate scheduledDate, Integer estimatedMinutes) {
+        applyAiPlan(title, description, scheduledDate, estimatedMinutes, null);
     }
 
     public void setEstimatedMinutes(Integer estimatedMinutes) {

@@ -28,6 +28,8 @@ public class UserPreference {
     private boolean likeNotificationEnabled;
     @Column(name = "ranking_change_notification_enabled", nullable = false)
     private boolean rankingChangeNotificationEnabled;
+    @Column(name = "daily_available_minutes")
+    private Integer dailyAvailableMinutes;
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
     @Column(name = "updated_at", nullable = false)
@@ -56,7 +58,8 @@ public class UserPreference {
                        Boolean aiRescheduleEnabled, Boolean notificationEnabled,
                        PuzzleVisibility defaultPuzzleVisibility,
                        Boolean rankingParticipationEnabled, Boolean galleryNicknameVisible,
-                       Boolean likeNotificationEnabled, Boolean rankingChangeNotificationEnabled) {
+                       Boolean likeNotificationEnabled, Boolean rankingChangeNotificationEnabled,
+                       Integer dailyAvailableMinutes) {
         if (maxDailyTasks != null) this.maxDailyTasks = maxDailyTasks;
         if (weekendScheduleEnabled != null) this.weekendScheduleEnabled = weekendScheduleEnabled;
         if (aiRescheduleEnabled != null) this.aiRescheduleEnabled = aiRescheduleEnabled;
@@ -66,7 +69,18 @@ public class UserPreference {
         if (galleryNicknameVisible != null) this.galleryNicknameVisible = galleryNicknameVisible;
         if (likeNotificationEnabled != null) this.likeNotificationEnabled = likeNotificationEnabled;
         if (rankingChangeNotificationEnabled != null) this.rankingChangeNotificationEnabled = rankingChangeNotificationEnabled;
+        if (dailyAvailableMinutes != null) this.dailyAvailableMinutes = dailyAvailableMinutes;
         this.updatedAt = LocalDateTime.now();
+    }
+
+    public void update(Integer maxDailyTasks, Boolean weekendScheduleEnabled,
+                       Boolean aiRescheduleEnabled, Boolean notificationEnabled,
+                       PuzzleVisibility defaultPuzzleVisibility,
+                       Boolean rankingParticipationEnabled, Boolean galleryNicknameVisible,
+                       Boolean likeNotificationEnabled, Boolean rankingChangeNotificationEnabled) {
+        update(maxDailyTasks, weekendScheduleEnabled, aiRescheduleEnabled, notificationEnabled,
+                defaultPuzzleVisibility, rankingParticipationEnabled, galleryNicknameVisible,
+                likeNotificationEnabled, rankingChangeNotificationEnabled, null);
     }
 
     public Long getUserId() { return userId; }
@@ -79,4 +93,5 @@ public class UserPreference {
     public boolean isGalleryNicknameVisible() { return galleryNicknameVisible; }
     public boolean isLikeNotificationEnabled() { return likeNotificationEnabled; }
     public boolean isRankingChangeNotificationEnabled() { return rankingChangeNotificationEnabled; }
+    public Integer getDailyAvailableMinutes() { return dailyAvailableMinutes; }
 }

@@ -14,6 +14,7 @@ import hackathon.app.domain.scheduleitem.entity.ScheduleItem;
 import hackathon.app.domain.scheduleitem.entity.ScheduleItemStatus;
 import hackathon.app.domain.scheduleitem.repository.PuzzleCountProjection;
 import hackathon.app.domain.scheduleitem.repository.ScheduleItemRepository;
+import hackathon.app.domain.scheduleitem.policy.CategoryChecker;
 import hackathon.app.global.common.CursorCodec;
 import hackathon.app.global.common.CursorPage;
 import hackathon.app.common.error.ApiException;
@@ -46,6 +47,7 @@ public class ScheduleService {
     private final ScheduleRepository scheduleRepository;
     private final ScheduleItemRepository scheduleItemRepository;
     private final ScheduleChangeLogger changeLogger;
+    private final CategoryChecker categoryChecker;
     private final Clock clock;
 
     /** POST /schedules — 사용자가 직접 빈 스케줄 생성 */
@@ -54,9 +56,11 @@ public class ScheduleService {
         if (request.startDate().isAfter(request.endDate())) {
             throw new ApiException(ErrorCode.INVALID_SCHEDULE_PERIOD);
         }
+        validateCategory(request.categoryId());
 
         Schedule schedule = scheduleRepository.save(Schedule.builder()
                 .userId(userId)
+                .categoryId(request.categoryId())
                 .title(request.title())
                 .description(request.description())
                 .status(ScheduleStatus.ACTIVE)
@@ -117,6 +121,7 @@ public class ScheduleService {
             throw new ApiException(ErrorCode.INVALID_REQUEST, "변경할 필드가 최소 하나 필요합니다.");
         }
         Schedule schedule = getOwnedSchedule(userId, scheduleId);
+        validateCategory(request.categoryId());
 
         LocalDate newStart = request.startDate() != null ? request.startDate() : schedule.getStartDate();
         LocalDate newEnd = request.endDate() != null ? request.endDate() : schedule.getEndDate();
@@ -138,7 +143,8 @@ public class ScheduleService {
         }
 
         Map<String, Object> before = snapshot(schedule);
-        schedule.update(request.title(), request.description(), request.startDate(), request.endDate());
+        schedule.update(request.title(), request.description(), request.startDate(), request.endDate(),
+                request.categoryId());
         Map<String, Object> after = snapshot(schedule);
 
         changeLogger.log(schedule.getId(), null, userId, ChangeAction.UPDATE, ChangeSource.USER,
@@ -148,6 +154,20 @@ public class ScheduleService {
         return ScheduleSummaryResponse.of(schedule,
                 c == null ? 0 : c.getPuzzleCount(),
                 c == null ? 0 : c.getCompletedPuzzleCount());
+    }
+
+    /** POST /schedules/{scheduleId}/confirm — AI 초안을 활성 일정으로 확정한다. */
+    @Transactional
+    public ScheduleSummaryResponse confirmSchedule(Long userId, Long scheduleId) {
+        Schedule schedule = getOwnedSchedule(userId, scheduleId);
+        Map<String, Object> before = snapshot(schedule);
+        schedule.confirm();
+        changeLogger.log(schedule.getId(), null, userId, ChangeAction.UPDATE, ChangeSource.USER,
+                schedule.getCurrentVersion(), before, snapshot(schedule), "AI 초안 확정");
+        PuzzleCountProjection counts = countPuzzles(List.of(schedule)).get(schedule.getId());
+        return ScheduleSummaryResponse.of(schedule,
+                counts == null ? 0 : counts.getPuzzleCount(),
+                counts == null ? 0 : counts.getCompletedPuzzleCount());
     }
 
     /** DELETE /schedules/{scheduleId} — 스케줄 + 하위 작업 소프트 삭제, 변경 이력 기록 */
@@ -199,9 +219,17 @@ public class ScheduleService {
         return Math.min(size, MAX_PAGE_SIZE);
     }
 
+    private void validateCategory(Long categoryId) {
+        if (categoryId != null && !categoryChecker.existsActive(categoryId)) {
+            throw new ApiException(ErrorCode.INVALID_REQUEST,
+                    "존재하지 않거나 사용 중지된 카테고리입니다: " + categoryId);
+        }
+    }
+
     private Map<String, Object> snapshot(Schedule s) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("title", s.getTitle());
+        m.put("categoryId", s.getCategoryId());
         m.put("description", s.getDescription());
         m.put("status", s.getStatus().name());
         m.put("startDate", s.getStartDate().toString());

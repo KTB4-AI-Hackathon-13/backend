@@ -16,13 +16,15 @@ public class ConversationService {
     private final ConversationMessageRepository messages;
     private final AiConversationClient ai;
     private final Clock clock;
+    private final tools.jackson.databind.ObjectMapper objectMapper;
 
     public ConversationService(ConversationRepository conversations, ConversationMessageRepository messages,
-            AiConversationClient ai, Clock clock) {
+            AiConversationClient ai, Clock clock, tools.jackson.databind.ObjectMapper objectMapper) {
         this.conversations = conversations;
         this.messages = messages;
         this.ai = ai;
         this.clock = clock;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional
@@ -84,8 +86,11 @@ public class ConversationService {
                 sequence, MessageRole.USER, null, content, replacesId, null, null, null, userTime));
         AiConversationResult result = ai.reply(content);
         LocalDateTime assistantTime = now();
+        String payloadJson = result.planDraft() == null ? null : objectMapper.writeValueAsString(result.planDraft());
+        MessageType messageType = payloadJson == null ? MessageType.TEXT : MessageType.PLAN_DRAFT;
         ConversationMessage assistant = messages.save(ConversationMessage.create(conversation.getId(), userMessage.getId(),
-                sequence + 1, MessageRole.ASSISTANT, null, result.content(), null, result.modelName(),
+                sequence + 1, MessageRole.ASSISTANT, messageType, payloadJson,
+                result.action().type().name(), result.content(), null, result.modelName(),
                 result.tokenUsage().promptTokens(), result.tokenUsage().completionTokens(), assistantTime));
         conversation.messageAdded(assistantTime);
         return new MessageExchangeResponse(MessageResponse.from(userMessage), MessageResponse.from(assistant), readiness(content));

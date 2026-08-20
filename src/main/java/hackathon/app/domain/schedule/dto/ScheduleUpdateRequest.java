@@ -10,9 +10,14 @@ public record ScheduleUpdateRequest(
         @Size(max = 5000, message = "설명은 5000자 이하여야 합니다.")
         String description,
         LocalDate startDate,
-        LocalDate endDate
+        LocalDate endDate,
+        Long categoryId
 ) {
+    public ScheduleUpdateRequest(String title, String description, LocalDate startDate, LocalDate endDate) {
+        this(title, description, startDate, endDate, null);
+    }
+
     public boolean isEmpty() {
-        return title == null && description == null && startDate == null && endDate == null;
+        return title == null && description == null && startDate == null && endDate == null && categoryId == null;
     }
 }

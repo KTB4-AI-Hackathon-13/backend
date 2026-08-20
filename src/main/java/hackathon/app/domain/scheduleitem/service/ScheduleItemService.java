@@ -11,7 +11,7 @@ import hackathon.app.domain.scheduleitem.dto.ScheduleItemStatusResponse;
 import hackathon.app.domain.scheduleitem.dto.ScheduleItemUpdateRequest;
 import hackathon.app.domain.scheduleitem.entity.ScheduleItem;
 import hackathon.app.domain.scheduleitem.entity.ScheduleItemStatus;
-import hackathon.app.domain.scheduleitem.policy.CategoryChecker;
+import hackathon.app.domain.scheduleitem.entity.ScheduleItemType;
 import hackathon.app.domain.scheduleitem.policy.DailyTaskLimitProvider;
 import hackathon.app.domain.scheduleitem.policy.PuzzlePieceAwarder;
 import hackathon.app.domain.scheduleitem.repository.ScheduleItemRepository;
@@ -46,7 +46,6 @@ public class ScheduleItemService {
     private final ScheduleService scheduleService;
     private final ScheduleChangeLogger changeLogger;
     private final DailyTaskLimitProvider dailyTaskLimitProvider;
-    private final CategoryChecker categoryChecker;
     private final PuzzlePieceAwarder puzzlePieceAwarder;
     private final Clock clock;
 
@@ -54,20 +53,20 @@ public class ScheduleItemService {
     @Transactional
     public ScheduleItemResponse createStandaloneItem(Long userId, ScheduleItemCreateRequest request) {
         validateDailyLimit(userId, request.scheduledDate(), NO_EXCLUDE);
-        validateCategory(request.categoryId());
+        validateEstimatedMinutes(request.estimatedMinutes());
+        ScheduleItemType itemType = ScheduleItemType.from(request.itemType());
         int position = request.position() != null
                 ? request.position()
                 : scheduleItemRepository.nextStandalonePosition(userId, request.scheduledDate());
         ScheduleItem item = scheduleItemRepository.save(ScheduleItem.builder()
                 .schedule(null)
                 .userId(userId)
-                .categoryId(request.categoryId())
                 .title(request.title())
                 .description(request.description())
                 .scheduledDate(request.scheduledDate())
-                .workload(request.workload())
                 .estimatedMinutes(request.estimatedMinutes())
-                .priority(request.priority())
+                .itemType(itemType)
+                .priority(3)
                 .position(position)
                 .source(ChangeSource.USER)
                 .build());
@@ -83,7 +82,8 @@ public class ScheduleItemService {
 
         validateDateInPeriod(schedule, request.scheduledDate());
         validateDailyLimit(userId, request.scheduledDate(), NO_EXCLUDE);
-        validateCategory(request.categoryId());
+        validateEstimatedMinutes(request.estimatedMinutes());
+        ScheduleItemType itemType = ScheduleItemType.from(request.itemType());
 
         int position = request.position() != null
                 ? request.position()
@@ -92,13 +92,12 @@ public class ScheduleItemService {
         ScheduleItem item = scheduleItemRepository.save(ScheduleItem.builder()
                 .schedule(schedule)
                 .userId(userId)
-                .categoryId(request.categoryId())
                 .title(request.title())
                 .description(request.description())
                 .scheduledDate(request.scheduledDate())
-                .workload(request.workload())
                 .estimatedMinutes(request.estimatedMinutes())
-                .priority(request.priority())
+                .itemType(itemType)
+                .priority(3)
                 .position(position)
                 .source(ChangeSource.USER)
                 .build());
@@ -124,11 +123,12 @@ public class ScheduleItemService {
             if (schedule != null) validateDateInPeriod(schedule, request.scheduledDate());
             validateDailyLimit(userId, request.scheduledDate(), item.getId());
         }
-        validateCategory(request.categoryId());
+        if (request.estimatedMinutes() != null) validateEstimatedMinutes(request.estimatedMinutes());
+        ScheduleItemType itemType = request.itemType() == null ? null : ScheduleItemType.from(request.itemType());
 
         Map<String, Object> before = snapshot(item);
-        item.update(request.title(), request.description(), request.scheduledDate(), request.categoryId(),
-                request.workload(), request.estimatedMinutes(), request.priority(), request.position());
+        item.update(request.title(), request.description(), request.scheduledDate(),
+                request.estimatedMinutes(), itemType, null, request.position());
         Map<String, Object> after = snapshot(item);
 
         if (schedule != null) schedule.increaseVersion();
@@ -211,9 +211,9 @@ public class ScheduleItemService {
         }
     }
 
-    private void validateCategory(Long categoryId) {
-        if (categoryId != null && !categoryChecker.existsActive(categoryId)) {
-            throw new ApiException(ErrorCode.INVALID_REQUEST, "존재하지 않거나 사용 중지된 카테고리입니다: " + categoryId);
+    private void validateEstimatedMinutes(Integer estimatedMinutes) {
+        if (estimatedMinutes == null || estimatedMinutes < 1 || estimatedMinutes > 1440) {
+            throw new ApiException(ErrorCode.INVALID_ESTIMATED_MINUTES);
         }
     }
 
@@ -222,8 +222,8 @@ public class ScheduleItemService {
         m.put("title", i.getTitle());
         m.put("description", i.getDescription());
         m.put("scheduledDate", i.getScheduledDate().toString());
-        m.put("categoryId", i.getCategoryId());
-        m.put("workload", i.getWorkload());
+        m.put("estimatedMinutes", i.getEstimatedMinutes());
+        m.put("itemType", i.getItemType().name());
         m.put("priority", i.getPriority());
         m.put("position", i.getPosition());
         m.put("status", i.getStatus().name());

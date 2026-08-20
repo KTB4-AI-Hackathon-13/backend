@@ -71,6 +71,13 @@ public class ScheduleController {
         return ApiResponse.of(scheduleService.updateSchedule(loginUser.userId(), scheduleId, request));
     }
 
+    /** AI가 만든 DRAFT 스케줄을 달력에 확정 등록한다. */
+    @PostMapping("/{scheduleId}/confirm")
+    public ApiResponse<ScheduleSummaryResponse> confirmSchedule(@LoginUser LoginUserInfo loginUser,
+                                                                @PathVariable Long scheduleId) {
+        return ApiResponse.of(scheduleService.confirmSchedule(loginUser.userId(), scheduleId));
+    }
+
     /** 스케줄 삭제 (소프트 삭제) → 204 */
     @DeleteMapping("/{scheduleId}")
     public ResponseEntity<Void> deleteSchedule(@LoginUser LoginUserInfo loginUser,

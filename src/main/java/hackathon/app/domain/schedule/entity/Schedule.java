@@ -36,6 +36,10 @@ public class Schedule extends BaseTimeEntity {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
+    /** categories.id. 랭킹·통계 범위는 작업이 아니라 스케줄의 카테고리를 따른다. */
+    @Column(name = "category_id")
+    private Long categoryId;
+
     @Column(name = "title", nullable = false, length = 200)
     private String title;
 
@@ -63,9 +67,10 @@ public class Schedule extends BaseTimeEntity {
     private LocalDateTime deletedAt;
 
     @Builder
-    private Schedule(Long userId, String title, String description, ScheduleStatus status,
+    private Schedule(Long userId, Long categoryId, String title, String description, ScheduleStatus status,
                      ChangeSource source, LocalDate startDate, LocalDate endDate) {
         this.userId = userId;
+        this.categoryId = categoryId;
         this.title = title;
         this.description = description;
         this.status = status != null ? status : ScheduleStatus.DRAFT;
@@ -86,7 +91,7 @@ public class Schedule extends BaseTimeEntity {
     }
 
     /** 제목/설명/기간 수정. null 인 값은 변경하지 않는다. 버전을 1 올린다. */
-    public void update(String title, String description, LocalDate startDate, LocalDate endDate) {
+    public void update(String title, String description, LocalDate startDate, LocalDate endDate, Long categoryId) {
         if (title != null) {
             this.title = title;
         }
@@ -99,6 +104,23 @@ public class Schedule extends BaseTimeEntity {
         if (endDate != null) {
             this.endDate = endDate;
         }
+        if (categoryId != null) {
+            this.categoryId = categoryId;
+        }
+        increaseVersion();
+    }
+
+    /** 기존 내부 호출 호환용. */
+    public void update(String title, String description, LocalDate startDate, LocalDate endDate) {
+        update(title, description, startDate, endDate, null);
+    }
+
+    public void confirm() {
+        if (status != ScheduleStatus.DRAFT) {
+            throw new hackathon.app.common.error.ApiException(
+                    hackathon.app.common.error.ErrorCode.SCHEDULE_NOT_DRAFT);
+        }
+        status = ScheduleStatus.ACTIVE;
         increaseVersion();
     }
 
