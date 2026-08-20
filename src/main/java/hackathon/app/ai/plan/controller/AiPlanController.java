@@ -4,9 +4,9 @@ import hackathon.app.ai.plan.dto.GenerateTemplateRequest;
 import hackathon.app.ai.plan.dto.GenerateScheduleRequest;
 import hackathon.app.ai.plan.dto.ReviseScheduleRequest;
 import hackathon.app.ai.plan.dto.TemplateResponse;
+import hackathon.app.ai.plan.dto.PlanTurnResponse;
 import hackathon.app.ai.plan.service.AiPlanService;
 import hackathon.app.common.api.ApiResponse;
-import hackathon.app.domain.schedule.dto.ScheduleDetailResponse;
 import hackathon.app.global.auth.LoginUser;
 import hackathon.app.global.auth.LoginUserInfo;
 import hackathon.app.global.common.ApiPaths;
@@ -28,15 +28,15 @@ public class AiPlanController {
     }
 
     @PostMapping("/ai-generations")
-    public ApiResponse<ScheduleDetailResponse> generate(@LoginUser LoginUserInfo loginUser,
-                                                        @Valid @RequestBody GenerateScheduleRequest request) {
+    public ApiResponse<PlanTurnResponse> generate(@LoginUser LoginUserInfo loginUser,
+                                                  @Valid @RequestBody GenerateScheduleRequest request) {
         return ApiResponse.of(aiPlanService.generate(loginUser.userId(), request));
     }
 
     @PostMapping("/{scheduleId}/ai-revisions")
-    public ApiResponse<ScheduleDetailResponse> revise(@LoginUser LoginUserInfo loginUser,
-                                                      @PathVariable Long scheduleId,
-                                                      @Valid @RequestBody ReviseScheduleRequest request) {
+    public ApiResponse<PlanTurnResponse> revise(@LoginUser LoginUserInfo loginUser,
+                                                @PathVariable String scheduleId,
+                                                @Valid @RequestBody ReviseScheduleRequest request) {
         return ApiResponse.of(aiPlanService.revise(loginUser.userId(), scheduleId, request));
     }
 }

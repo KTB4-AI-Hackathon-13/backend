@@ -8,13 +8,15 @@ public record TemplateResponse(String action, Payload payload) {
     public record Payload(
             String category,
             String goal_summary,
-            List<Question> questions
+            List<Question> questions,
+            String message
     ) {}
 
     public record Question(
             String id,
             String label,
             String type,
+            boolean required,
             List<String> options
     ) {}
 }
