@@ -24,6 +24,9 @@ spring:
       max-request-size: 11MB
 
 app:
+  ranking:
+    # 일별 통계와 랭킹 스냅샷 갱신 주기. 첫 랭킹 조회 시 당일 데이터가 없으면 즉시 생성한다.
+    refresh-cron: ${RANKING_REFRESH_CRON:0 */5 * * * *}
   ai:
     # BE가 외부 AI 서버에 동기 요청할 때 사용하는 주소와 타임아웃
     base-url: ${AI_BASE_URL:}
