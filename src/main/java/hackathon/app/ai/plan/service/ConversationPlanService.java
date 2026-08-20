@@ -2,6 +2,7 @@ package hackathon.app.ai.plan.service;
 
 import hackathon.app.ai.plan.client.AiPlanClient;
 import hackathon.app.ai.plan.dto.AiRevisePayload;
+import hackathon.app.ai.plan.dto.DailyTask;
 import hackathon.app.ai.plan.dto.PlanTurnResponse;
 import hackathon.app.ai.plan.dto.SchedulePlan;
 import hackathon.app.conversation.ConversationService;
