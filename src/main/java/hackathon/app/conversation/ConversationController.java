@@ -42,6 +42,6 @@ public class ConversationController {
     @ResponseStatus(HttpStatus.CREATED)
     ApiResponse<MessageExchangeResponse> send(@LoginUser LoginUserInfo loginUser, @PathVariable String conversationId,
             @Valid @RequestBody MessageRequest body) {
-        return ApiResponse.of(service.send(loginUser.userId(), conversationId, body.content()));
+        return ApiResponse.of(service.send(loginUser.userId(), conversationId, body.message()));
     }
 }
