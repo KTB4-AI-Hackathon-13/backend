@@ -6,6 +6,7 @@ import org.springframework.transaction.annotation.Transactional;
 import hackathon.app.common.error.ApiException;
 import hackathon.app.common.error.ErrorCode;
 import hackathon.app.domain.puzzle.entity.Puzzle;
+import hackathon.app.domain.puzzle.entity.PuzzleVisibility;
 import hackathon.app.domain.puzzle.repository.PuzzleRepository;
 import hackathon.app.image.entity.ImageOwnerType;
 import hackathon.app.image.entity.StoredImage;
@@ -31,7 +32,13 @@ public class ImageReadAccessPolicy {
         }
 
         Puzzle puzzle = puzzles.findById(puzzleId).orElseThrow(this::accessDenied);
-        if (puzzle.getDeletedAt() == null && puzzle.isCompleted()) return;
+        if (puzzle.getDeletedAt() != null) {
+            throw accessDenied();
+        }
+        if (puzzle.isOwnedBy(viewerUserId)
+                || (puzzle.isCompleted() && puzzle.getVisibility() == PuzzleVisibility.PUBLIC)) {
+            return;
+        }
         throw accessDenied();
     }
 

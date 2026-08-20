@@ -328,8 +328,9 @@ WHERE schedule_id = :schedule_id
 
 | 기능 | Method | URL | 인증 | 주요 요청값 | 주요 응답값 | 연결 테이블 |
 |---|---|---|---:|---|---|---|
-| 랭킹 조회 | GET | `/rankings` | 선택 | `type`, `categoryId?`, `period?`, `size?` | 순위 목록, 내 순위 | `ranking_snapshots` |
-| 랭킹 사용자 퍼즐 | GET | `/users/{userId}/public-puzzles` | 선택 | `sort?`, `size?`, `cursor?` | 공개 완성 퍼즐 | 퍼즐 테이블 추가 필요 |
+| 랭킹 조회 | GET | `/rankings` | 선택 | `type`, `categoryId?`, `period?=ALL`, `size?` | 순위 목록, 내 순위 | `ranking_snapshots` |
+| 랭킹 사용자 퍼즐 | GET | `/users/{userId}/public-puzzles` | 선택 | `sort?`, `size?`, `cursor?` | 공개 완성 퍼즐 | `puzzles`, `puzzle_pieces` |
+| 활성 카테고리 | GET | `/categories` | 선택 | 없음 | 랭킹 범위 선택지 | `categories` |
 
 ### 랭킹 기준
 
@@ -338,6 +339,9 @@ WHERE schedule_id = :schedule_id
 | `STREAK` | 연속 실천 일수 |
 | `COMPLETED_PUZZLES` | 완성한 퍼즐 작품 수 |
 | `PUZZLE_PIECES` | 완료 작업으로 획득한 조각 수 |
+
+`period`는 `DAILY`, `WEEKLY`(월요일~기준일), `MONTHLY`, `YEARLY`, `ALL`을 지원한다.
+생략 시 `ALL`이며, `categoryId`가 없으면 전체, 있으면 해당 카테고리 랭킹이다.
 
 ### 랭킹 응답 필드
 
