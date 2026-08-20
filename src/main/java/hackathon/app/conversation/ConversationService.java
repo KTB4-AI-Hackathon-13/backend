@@ -1,6 +1,5 @@
 package hackathon.app.conversation;
 
-import hackathon.app.conversation.ai.*;
 import hackathon.app.conversation.domain.*;
 import hackathon.app.conversation.dto.response.*;
 import org.springframework.data.domain.PageRequest;
@@ -14,14 +13,12 @@ import java.util.*;
 public class ConversationService {
     private final ConversationRepository conversations;
     private final ConversationMessageRepository messages;
-    private final AiConversationClient ai;
     private final Clock clock;
 
     public ConversationService(ConversationRepository conversations, ConversationMessageRepository messages,
-            AiConversationClient ai, Clock clock) {
+            Clock clock) {
         this.conversations = conversations;
         this.messages = messages;
-        this.ai = ai;
         this.clock = clock;
     }
 
@@ -82,13 +79,11 @@ public class ConversationService {
         LocalDateTime userTime = now();
         ConversationMessage userMessage = messages.save(ConversationMessage.create(conversation.getId(), parentId,
                 sequence, MessageRole.USER, content, replacesId, null, null, null, userTime));
-        AiConversationResult result = ai.reply(content);
-        LocalDateTime assistantTime = now();
-        ConversationMessage assistant = messages.save(ConversationMessage.create(conversation.getId(), userMessage.getId(),
-                sequence + 1, MessageRole.ASSISTANT, result.content(), null, result.modelName(),
-                result.tokenUsage().promptTokens(), result.tokenUsage().completionTokens(), assistantTime));
-        conversation.messageAdded(assistantTime);
-        return new MessageExchangeResponse(MessageResponse.from(userMessage), MessageResponse.from(assistant), readiness(content));
+        conversation.messageAdded(userTime);
+
+        // AI 응답은 AiPlanService의 /schedules/templates, /ai-generations,
+        // /ai-revisions 흐름에서 처리한다. 이 엔드포인트는 대화 로그만 저장한다.
+        return new MessageExchangeResponse(MessageResponse.from(userMessage), null, readiness(content));
     }
 
     private PlanReadinessResponse readiness(String content) {
