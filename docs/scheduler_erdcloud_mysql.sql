@@ -198,6 +198,7 @@ CREATE TABLE conversation_messages (
   parent_message_id CHAR(36) NULL COMMENT 'Previous message in the selected conversation branch',
   sequence_no INT NOT NULL COMMENT 'Stable message order within a conversation',
   role ENUM('SYSTEM','USER','ASSISTANT','TOOL') NOT NULL,
+  action VARCHAR(30) NULL COMMENT 'template, reject, plan_turn, plan_confirmed',
   content LONGTEXT NULL,
   replaces_message_id CHAR(36) NULL COMMENT 'Original message retained when user edits a message',
   model_name VARCHAR(100) NULL,

@@ -81,11 +81,11 @@ public class ConversationService {
         int sequence = messages.findMaxSequenceNo(conversation.getId()) + 1;
         LocalDateTime userTime = now();
         ConversationMessage userMessage = messages.save(ConversationMessage.create(conversation.getId(), parentId,
-                sequence, MessageRole.USER, content, replacesId, null, null, null, userTime));
+                sequence, MessageRole.USER, null, content, replacesId, null, null, null, userTime));
         AiConversationResult result = ai.reply(content);
         LocalDateTime assistantTime = now();
         ConversationMessage assistant = messages.save(ConversationMessage.create(conversation.getId(), userMessage.getId(),
-                sequence + 1, MessageRole.ASSISTANT, result.content(), null, result.modelName(),
+                sequence + 1, MessageRole.ASSISTANT, null, result.content(), null, result.modelName(),
                 result.tokenUsage().promptTokens(), result.tokenUsage().completionTokens(), assistantTime));
         conversation.messageAdded(assistantTime);
         return new MessageExchangeResponse(MessageResponse.from(userMessage), MessageResponse.from(assistant), readiness(content));
