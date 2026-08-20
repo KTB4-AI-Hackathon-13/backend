@@ -64,7 +64,7 @@ public class AiPlanService {
         return response;
     }
 
-    public PlanTurnResponse revise(Long userId, String scheduleId, ReviseScheduleRequest request) {
+    public PlanRevisionResponse revise(Long userId, String scheduleId, ReviseScheduleRequest request) {
         validateConversation(userId, request.conversationId());
         validateTemplateAnswers(request.templateAnswers());
         if (request.currentPlan() == null) {
@@ -75,17 +75,22 @@ public class AiPlanService {
                 request.templateAnswers(), request.currentPlan(), request.userMessage(),
                 request.feedbackHistory() == null ? List.of() : request.feedbackHistory(),
                 emptyIfNull(request.busyDates()))));
+        Long imageId = null;
+        String imageUrl = null;
+        java.time.Instant imageUrlExpiresAt = null;
         if (response.confirmed()) {
             ImageService.ImageResult image = imageService.getRandomByCategoryName(response.category());
             Long savedScheduleId = confirmedPlanPersistenceService.save(
                     userId, request.conversationId(), request.goalSummary(), response.plan());
             response = response.withSavedScheduleId(savedScheduleId);
-            response = response.withImage(image.image().getId(), image.url(), image.expiresAt());
+            imageId = image.image().getId();
+            imageUrl = image.url();
+            imageUrlExpiresAt = image.expiresAt();
         }
         conversationRecorder.append(userId, request.conversationId(), request.userMessage(), response,
                 response.confirmed() ? AiPlanConversationRecorder.PLAN_CONFIRMED
                         : AiPlanConversationRecorder.PLAN_TURN);
-        return response;
+        return PlanRevisionResponse.from(response, imageId, imageUrl, imageUrlExpiresAt);
     }
 
     private void validateConversation(Long userId, String conversationId) {
