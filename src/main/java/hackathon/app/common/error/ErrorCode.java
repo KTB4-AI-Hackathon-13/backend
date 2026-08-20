@@ -38,6 +38,9 @@ public enum ErrorCode {
     MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "메시지를 찾을 수 없습니다."),
     CONVERSATION_ARCHIVED(HttpStatus.CONFLICT, "보관된 대화방에는 메시지를 추가할 수 없습니다."),
     INVALID_CONVERSATION_STATUS(HttpStatus.UNPROCESSABLE_ENTITY, "대화방은 ARCHIVED 상태로만 변경할 수 있습니다."),
+    PLAN_INFORMATION_INCOMPLETE(HttpStatus.UNPROCESSABLE_ENTITY, "계획 생성에 필요한 정보가 부족합니다."),
+    AI_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "AI 호출 한도를 초과했습니다."),
+    AI_PROVIDER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "AI 서비스에 일시적으로 연결할 수 없습니다."),
 
     // ===== 이미지 API =====
     IMAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "이미지를 찾을 수 없습니다."),

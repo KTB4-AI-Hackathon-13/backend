@@ -107,6 +107,13 @@ public class Schedule extends BaseTimeEntity {
         this.currentVersion++;
     }
 
+    /** AI가 확정한 전체 계획 요약을 반영한다. 버전 증가는 작업 변경 단위에서 수행한다. */
+    public void applyAiSummary(String summary) {
+        if (summary != null) {
+            this.description = summary;
+        }
+    }
+
     public void softDelete(LocalDateTime now) {
         this.deletedAt = now;
     }
