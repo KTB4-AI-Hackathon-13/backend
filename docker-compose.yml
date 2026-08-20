@@ -2,6 +2,10 @@ services:
   app:
     container_name: backend
     image: 707071531352.dkr.ecr.ap-northeast-2.amazonaws.com/hackathon/be:${IMAGE_TAG}
-    ports:
-      - "8080:8080"
+    # MySQL 이 같은 EC2 호스트에 직접 설치돼 있어 호스트 네트워크를 공유한다.
+    # 이러면 컨테이너의 127.0.0.1 이 곧 호스트의 127.0.0.1 이라 DB 설정을 손대지 않아도 붙는다.
+    # (host 네트워크에서는 ports 매핑이 무시되므로 제거했다. 앱은 호스트의 8080 에 직접 바인딩된다.)
+    network_mode: host
+    env_file:
+      - .env
     restart: unless-stopped
