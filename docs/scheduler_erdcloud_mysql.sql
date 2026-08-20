@@ -198,6 +198,7 @@ CREATE TABLE conversation_messages (
   parent_message_id CHAR(36) NULL COMMENT 'Previous message in the selected conversation branch',
   sequence_no INT NOT NULL COMMENT 'Stable message order within a conversation',
   role ENUM('SYSTEM','USER','ASSISTANT','TOOL') NOT NULL,
+  action VARCHAR(30) NULL COMMENT 'template, reject, plan_turn, plan_confirmed',
   content LONGTEXT NULL,
   replaces_message_id CHAR(36) NULL COMMENT 'Original message retained when user edits a message',
   model_name VARCHAR(100) NULL,
@@ -234,6 +235,7 @@ CREATE TABLE ai_generation_jobs (
 CREATE TABLE images (
   id BIGINT NOT NULL AUTO_INCREMENT,
   uploader_user_id BIGINT NOT NULL,
+  category_id BIGINT NULL,
   owner_type ENUM('USER','MESSAGE','SCHEDULE','SCHEDULE_ITEM','PUZZLE') NOT NULL,
   owner_id VARCHAR(100) NOT NULL COMMENT 'Polymorphic owner id; application validates target',
   storage_key VARCHAR(700) NOT NULL COMMENT 'S3-compatible object storage key',
@@ -248,7 +250,8 @@ CREATE TABLE images (
   PRIMARY KEY (id),
   UNIQUE KEY uk_images_storage_key (storage_key),
   KEY idx_images_owner (owner_type, owner_id),
-  KEY idx_images_uploader (uploader_user_id)
+  KEY idx_images_uploader (uploader_user_id),
+  KEY idx_images_category (category_id)
 );
 
 CREATE TABLE puzzles (
@@ -385,7 +388,8 @@ ALTER TABLE ai_generation_jobs
   ADD CONSTRAINT fk_generation_schedule FOREIGN KEY (schedule_id) REFERENCES schedules (id);
 
 ALTER TABLE images
-  ADD CONSTRAINT fk_image_uploader FOREIGN KEY (uploader_user_id) REFERENCES users (id);
+  ADD CONSTRAINT fk_image_uploader FOREIGN KEY (uploader_user_id) REFERENCES users (id),
+  ADD CONSTRAINT fk_image_category FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE SET NULL;
 
 ALTER TABLE users
   ADD CONSTRAINT fk_user_profile_image FOREIGN KEY (profile_image_id) REFERENCES images (id);

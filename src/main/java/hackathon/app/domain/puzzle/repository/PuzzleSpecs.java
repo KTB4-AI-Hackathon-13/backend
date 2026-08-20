@@ -2,7 +2,6 @@ package hackathon.app.domain.puzzle.repository;
 
 import hackathon.app.domain.puzzle.entity.Puzzle;
 import hackathon.app.domain.puzzle.entity.PuzzleStatus;
-import hackathon.app.domain.puzzle.entity.PuzzleVisibility;
 import org.springframework.data.jpa.domain.Specification;
 
 /** 퍼즐 목록 조회용 동적 조건 */
@@ -17,10 +16,6 @@ public final class PuzzleSpecs {
 
     public static Specification<Puzzle> hasStatus(PuzzleStatus status) {
         return (root, query, cb) -> status == null ? null : cb.equal(root.get("status"), status);
-    }
-
-    public static Specification<Puzzle> hasVisibility(PuzzleVisibility visibility) {
-        return (root, query, cb) -> cb.equal(root.get("visibility"), visibility);
     }
 
     /** id 내림차순 페이징에서 커서(마지막 id)보다 작은 행만 */

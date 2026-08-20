@@ -56,6 +56,7 @@
 
 | 기능 | Method | URL | 인증 | 주요 요청값 | 주요 응답값 | 연결 테이블 |
 |---|---|---|---:|---|---|---|
+| ✅ 사용자 스케줄 생성 | POST | `/schedules` | O | `title`, `description?`, `startDate`, `endDate` | 생성 스케줄, 퍼즐 수 0 | `schedules`, `schedule_change_logs` |
 | 회원가입 | POST | `/auth/signup` | X | `email`, `password`, `passwordConfirmation`, `nickname`, `termsAgreed`, `privacyAgreed` | `userId`, `email`, `nickname` | `users`, `user_auth_accounts` |
 | 로그인 | POST | `/auth/login` | X | `email`, `password` | 사용자 요약, 세션 쿠키 | `users`, `auth_sessions` |
 | 로그아웃 | POST | `/auth/logout` | O | 없음 | 204 | `auth_sessions` |
@@ -267,8 +268,8 @@ WHERE schedule_id = :schedule_id
 
 | 기능 | Method | URL | 인증 | Content-Type | 주요 요청값 | 주요 응답값 | 연결 테이블 |
 |---|---|---|---:|---|---|---|---|
-| 이미지 업로드 | POST | `/images` | O | `multipart/form-data` | `file`, `ownerType`, `ownerId` | 이미지 ID·URL·크기 | `images` |
-| 이미지 조회 | GET | `/images/{imageId}` | 권한별 | JSON | 없음 | 메타데이터, 서명 URL | `images` |
+| 이미지 업로드 | POST | `/images` | O | `multipart/form-data` | `file`, `ownerType`, `ownerId`, `categoryId?` | 이미지 ID·URL·크기·카테고리 | `images`, `categories` |
+| 이미지 조회 | GET | `/images/{imageId}` | 권한별 | JSON | 없음 | 메타데이터, categoryId, 서명 URL | `images`, `categories` |
 | 이미지 삭제 | DELETE | `/images/{imageId}` | O | JSON | 없음 | 204 | `images` |
 
 ### 이미지 업로드 제한
