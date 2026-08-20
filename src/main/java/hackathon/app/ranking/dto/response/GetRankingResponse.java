@@ -4,10 +4,9 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
-import hackathon.app.ranking.entity.RankingSnapshot;
 import hackathon.app.ranking.enums.RankingTier;
+import hackathon.app.ranking.service.RankingResult;
 
 /**
  * GET /api/v1/rankings 응답. ApiResponse 로 한 번 더 감싸지므로 실제 JSON 은 {"data": { ... }} 형태다.
@@ -16,58 +15,54 @@ import hackathon.app.ranking.enums.RankingTier;
 public record GetRankingResponse(
         LocalDate rankingDate,
         List<RankingItem> items,
-        MyRanking myRanking
+        MyRanking myRanking,
+        int participantCount
 ) {
 
     public record RankingItem(int rank, Long userId, String nickname, BigDecimal score) {
 
-        public static RankingItem of(RankingSnapshot snapshot, String nickname) {
+        public static RankingItem of(RankingResult.Entry entry) {
             return new RankingItem(
-                    snapshot.getRankNo(),
-                    snapshot.getUserId(),
-                    nickname,
-                    snapshot.getScore()
+                    entry.rank(),
+                    entry.userId(),
+                    entry.nickname(),
+                    entry.score()
             );
         }
     }
 
     public record MyRanking(int rank, BigDecimal score, RankingTier tier) {
 
-        public static MyRanking of(RankingSnapshot snapshot, long participants) {
+        public static MyRanking of(RankingResult.Entry entry, long participants) {
             return new MyRanking(
-                    snapshot.getRankNo(),
-                    snapshot.getScore(),
-                    RankingTier.of(snapshot.getRankNo(), participants)
+                    entry.rank(),
+                    entry.score(),
+                    RankingTier.of(entry.rank(), participants)
             );
         }
     }
 
-    /** 닉네임을 찾지 못한 사용자에게 쓰는 표시값. 랭킹 목록이 통째로 비지 않도록 한다. */
-    private static final String UNKNOWN_NICKNAME = "알 수 없음";
-
     /**
      * 조회 결과를 한 번에 응답으로 만든다.
      *
-     * @param mySnapshot  로그인하지 않았거나 내 순위가 없으면 null
+     * @param myEntry  로그인하지 않았거나 내 순위가 없으면 null
      * @param participants tier 계산용 전체 참가자 수
      */
     public static GetRankingResponse of(LocalDate rankingDate,
-                                        List<RankingSnapshot> snapshots,
-                                        Map<Long, String> nicknames,
-                                        RankingSnapshot mySnapshot,
-                                        long participants) {
+                                        List<RankingResult.Entry> entries,
+                                        RankingResult.Entry myEntry,
+                                        int participants) {
         List<RankingItem> items = new ArrayList<>();
-        for (RankingSnapshot snapshot : snapshots) {
-            String nickname = nicknames.getOrDefault(snapshot.getUserId(), UNKNOWN_NICKNAME);
-            items.add(RankingItem.of(snapshot, nickname));
+        for (RankingResult.Entry entry : entries) {
+            items.add(RankingItem.of(entry));
         }
 
-        MyRanking myRanking = (mySnapshot == null) ? null : MyRanking.of(mySnapshot, participants);
-        return new GetRankingResponse(rankingDate, items, myRanking);
+        MyRanking myRanking = (myEntry == null) ? null : MyRanking.of(myEntry, participants);
+        return new GetRankingResponse(rankingDate, items, myRanking, participants);
     }
 
-    /** 배치가 아직 스냅샷을 적재하지 않은 상태. 에러가 아니라 빈 결과다. */
+    /** 활성 사용자에게 해당 조건의 활동이 아직 없는 상태. */
     public static GetRankingResponse empty() {
-        return new GetRankingResponse(null, List.of(), null);
+        return new GetRankingResponse(null, List.of(), null, 0);
     }
 }

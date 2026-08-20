@@ -1,25 +1,16 @@
 package hackathon.app.ranking.service;
 
-import java.time.LocalDate;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import hackathon.app.auth.domain.AuthSession;
 import hackathon.app.auth.infrastructure.AuthSessionJpaRepository;
 import hackathon.app.ranking.dto.response.GetRankingResponse;
-import hackathon.app.ranking.entity.RankingSnapshot;
 import hackathon.app.ranking.enums.PeriodType;
-import hackathon.app.ranking.enums.RankingScope;
 import hackathon.app.ranking.enums.RankingType;
-import hackathon.app.ranking.repository.RankingSnapshotRepository;
-import hackathon.app.user.domain.User;
-import hackathon.app.user.infrastructure.JpaUserRepository;
 
 @Service
 @Transactional(readOnly = true)
@@ -28,13 +19,10 @@ public class RankingService {
 
     private static final int DEFAULT_RANKING_SIZE = 50;
     private static final int MAX_RANKING_SIZE = 100;
-    private static final int FIRST_PAGE = 0;
     private static final PeriodType DEFAULT_PERIOD = PeriodType.ALL;
 
-    private final RankingSnapshotRepository rankingSnapshotRepository;
     private final RankingSnapshotRefreshService rankingSnapshotRefreshService;
     private final AuthSessionJpaRepository authSessionRepository;
-    private final JpaUserRepository userRepository;
 
     public GetRankingResponse getRankings(String sessionId, String type, Long categoryId, String period,
                                           Integer size) {
@@ -44,37 +32,25 @@ public class RankingService {
             throw new IllegalArgumentException("categoryId: 1 이상이어야 합니다.");
         }
         int pageSize = normalizeSize(size);
-        RankingScope scope = (categoryId == null) ? RankingScope.OVERALL : RankingScope.CATEGORY;
 
-        rankingSnapshotRefreshService.refreshIfStale();
+        RankingResult result = rankingSnapshotRefreshService.calculateCurrent(
+                rankingType, periodType, categoryId);
+        List<RankingResult.Entry> topEntries = result.entries().stream().limit(pageSize).toList();
+        RankingResult.Entry myEntry = findMyEntry(sessionId, result.entries());
 
-        LocalDate rankingDate =
-                rankingSnapshotRepository.findLatestRankingDate(rankingType, periodType, scope, categoryId);
-        if (rankingDate == null) {
-            return GetRankingResponse.empty();
-        }
-
-        List<RankingSnapshot> snapshots = rankingSnapshotRepository.findTopRankings(
-                rankingDate, rankingType, periodType, scope, categoryId,
-                PageRequest.of(FIRST_PAGE, pageSize));
-        RankingSnapshot mySnapshot =
-                findMySnapshot(sessionId, rankingDate, rankingType, periodType, scope, categoryId);
-        long participants = (mySnapshot == null)
-                ? 0
-                : rankingSnapshotRepository.countParticipants(rankingDate, rankingType, periodType, scope, categoryId);
-
-        return GetRankingResponse.of(rankingDate, snapshots, findNicknames(snapshots), mySnapshot, participants);
+        return GetRankingResponse.of(
+                result.rankingDate(), topEntries, myEntry, result.entries().size());
     }
 
     /** 내 순위는 상위 50명 밖에 있어도 채워야 하므로 별도로 조회한다. 비로그인이면 null 이다. */
-    private RankingSnapshot findMySnapshot(String sessionId, LocalDate rankingDate, RankingType type,
-                                           PeriodType period, RankingScope scope, Long categoryId) {
+    private RankingResult.Entry findMyEntry(String sessionId, List<RankingResult.Entry> entries) {
         Long myUserId = currentUserIdOrNull(sessionId);
         if (myUserId == null) {
             return null;
         }
-        return rankingSnapshotRepository
-                .findByUser(rankingDate, type, period, scope, categoryId, myUserId)
+        return entries.stream()
+                .filter(entry -> entry.userId().equals(myUserId))
+                .findFirst()
                 .orElse(null);
     }
 
@@ -93,20 +69,6 @@ public class RankingService {
                 .filter(AuthSession::isUsable)
                 .map(AuthSession::getUserId)
                 .orElse(null);
-    }
-
-    /** 반복문 안에서 findById 를 부르면 N+1 이 된다. findAllById 한 번으로 끝낸다. */
-    private Map<Long, String> findNicknames(List<RankingSnapshot> snapshots) {
-        List<Long> userIds = snapshots.stream().map(RankingSnapshot::getUserId).toList();
-        if (userIds.isEmpty()) {
-            return Map.of();
-        }
-
-        Map<Long, String> nicknames = new HashMap<>();
-        for (User user : userRepository.findAllById(userIds)) {
-            nicknames.put(user.getId(), user.getNickname());
-        }
-        return nicknames;
     }
 
     private RankingType parseType(String type) {
