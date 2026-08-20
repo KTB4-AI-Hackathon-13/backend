@@ -40,3 +40,8 @@ out/
 .env
 .env.*
 !.env.example
+
+### Claude Code ###
+.claude/
+_workspace/
+CLAUDE.md
