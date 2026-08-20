@@ -3,6 +3,8 @@ package hackathon.app.ai.plan.client;
 import hackathon.app.ai.plan.dto.*;
 import hackathon.app.common.error.ApiException;
 import hackathon.app.common.error.ErrorCode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -11,6 +13,7 @@ import org.springframework.web.client.RestClientResponseException;
 
 @Component
 public class RemoteAiPlanClient implements AiPlanClient {
+    private static final Logger log = LoggerFactory.getLogger(RemoteAiPlanClient.class);
     private final RestClient client;
     private final boolean configured;
     public RemoteAiPlanClient(@Qualifier("aiPlanRestClient") RestClient client,
@@ -33,11 +36,14 @@ public class RemoteAiPlanClient implements AiPlanClient {
             if (result == null) throw new ApiException(ErrorCode.AI_PROVIDER_UNAVAILABLE);
             return result;
         } catch (RestClientResponseException exception) {
+            log.warn("AI 호출 실패 path={} status={} body={}", path,
+                    exception.getStatusCode(), exception.getResponseBodyAsString());
             if (exception.getStatusCode().value() == 429) throw new ApiException(ErrorCode.AI_RATE_LIMITED);
             throw new ApiException(ErrorCode.AI_PROVIDER_UNAVAILABLE);
         } catch (ApiException exception) {
             throw exception;
         } catch (RuntimeException exception) {
+            log.warn("AI 호출 실패(응답 처리 오류) path={}", path, exception);
             throw new ApiException(ErrorCode.AI_PROVIDER_UNAVAILABLE);
         }
     }
