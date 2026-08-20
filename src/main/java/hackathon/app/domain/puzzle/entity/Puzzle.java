@@ -18,7 +18,8 @@ import org.hibernate.annotations.SQLRestriction;
 
 /**
  * puzzles 테이블. 스케줄 1개당 퍼즐 1개 (uk_puzzle_schedule).
- * 스케줄의 작업을 처음 완료할 때 자동 생성되고, 유효한 작업을 모두 완료하면 COMPLETED 가 된다.
+ * AI 계획은 확정 시 이미지와 함께 생성되고, 이전 데이터는 첫 작업 완료 시에도 생성될 수 있다.
+ * 유효한 작업을 모두 완료하면 COMPLETED 가 된다.
  */
 @Entity
 @Table(name = "puzzles")
@@ -37,7 +38,7 @@ public class Puzzle extends BaseTimeEntity {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    /** images.id — 퍼즐 그림. 이미지 도메인 도입 전까지 null */
+    /** images.id — 같은 카테고리 기본 이미지를 여러 퍼즐이 공유할 수 있다. */
     @Column(name = "image_id")
     private Long imageId;
 
@@ -76,6 +77,13 @@ public class Puzzle extends BaseTimeEntity {
 
     public boolean isCompleted() {
         return this.status == PuzzleStatus.COMPLETED;
+    }
+
+    public void assignImage(Long imageId) {
+        if (imageId == null) {
+            throw new IllegalArgumentException("imageId는 null일 수 없습니다.");
+        }
+        this.imageId = imageId;
     }
 
     /**

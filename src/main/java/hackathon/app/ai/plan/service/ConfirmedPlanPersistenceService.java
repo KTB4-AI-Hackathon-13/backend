@@ -10,6 +10,8 @@ import hackathon.app.conversation.ConversationException;
 import hackathon.app.conversation.ConversationRepository;
 import hackathon.app.conversation.domain.Conversation;
 import hackathon.app.domain.puzzle.service.PuzzlePieceAwardService;
+import hackathon.app.domain.puzzle.entity.Puzzle;
+import hackathon.app.domain.puzzle.repository.PuzzleRepository;
 import hackathon.app.domain.schedule.entity.ChangeAction;
 import hackathon.app.domain.schedule.entity.ChangeSource;
 import hackathon.app.domain.schedule.entity.Schedule;
@@ -43,6 +45,7 @@ public class ConfirmedPlanPersistenceService {
     private final ConversationRepository conversationRepository;
     private final CategoryRepository categoryRepository;
     private final ScheduleRepository scheduleRepository;
+    private final PuzzleRepository puzzleRepository;
     private final ScheduleItemRepository itemRepository;
     private final ScheduleChangeLogger changeLogger;
     private final DailyTaskLimitProvider dailyTaskLimitProvider;
@@ -50,7 +53,8 @@ public class ConfirmedPlanPersistenceService {
     private final Clock clock;
 
     @Transactional
-    public Long save(Long userId, String conversationId, String goalSummary, String category, SchedulePlan plan) {
+    public Long save(Long userId, String conversationId, String goalSummary, String category,
+                     SchedulePlan plan, Long imageId) {
         Conversation conversation = conversationRepository.findOwnedForUpdate(conversationId, userId)
                 .orElseThrow(ConversationException::notFound);
         Long categoryId = resolveCategoryId(category);
@@ -58,7 +62,7 @@ public class ConfirmedPlanPersistenceService {
             Schedule existing = scheduleRepository.findById(conversation.getScheduleId())
                     .orElseThrow(() -> new ApiException(ErrorCode.SCHEDULE_NOT_FOUND));
             if (!existing.isOwnedBy(userId)) throw new ApiException(ErrorCode.FORBIDDEN);
-            return updateExisting(userId, existing, goalSummary, categoryId, plan);
+            return updateExisting(userId, existing, goalSummary, categoryId, plan, imageId);
         }
 
         List<DailyTask> tasks = validate(plan);
@@ -95,13 +99,14 @@ public class ConfirmedPlanPersistenceService {
                     schedule.getCurrentVersion(), null, snapshot(item), null);
         }
 
+        ensurePuzzle(schedule, imageId);
         conversation.linkSchedule(schedule.getId(), LocalDateTime.now(clock));
         puzzlePieceAwardService.refreshOnItemsChanged(schedule);
         return schedule.getId();
     }
 
     private Long updateExisting(Long userId, Schedule schedule, String goalSummary,
-                                Long categoryId, SchedulePlan plan) {
+                                Long categoryId, SchedulePlan plan, Long imageId) {
         List<DailyTask> tasks = validate(plan);
         List<ScheduleItem> existingItems = itemRepository
                 .findBySchedule_IdOrderByScheduledDateAscPositionAscPriorityAscIdAsc(schedule.getId());
@@ -194,8 +199,21 @@ public class ConfirmedPlanPersistenceService {
                     .max(LocalDate::compareTo).orElseThrow();
             schedule.update(truncate(goalSummary), plan.summary(), start, end, categoryId);
         }
+        ensurePuzzle(schedule, imageId);
         puzzlePieceAwardService.refreshOnItemsChanged(schedule);
         return schedule.getId();
+    }
+
+    /** 계획 확정 시 퍼즐을 미리 만들고, 재확정이면 새로 선택한 카테고리 이미지를 반영한다. */
+    private void ensurePuzzle(Schedule schedule, Long imageId) {
+        puzzleRepository.findByScheduleId(schedule.getId()).ifPresentOrElse(
+                puzzle -> puzzle.assignImage(imageId),
+                () -> puzzleRepository.save(Puzzle.builder()
+                        .scheduleId(schedule.getId())
+                        .userId(schedule.getUserId())
+                        .imageId(imageId)
+                        .title(schedule.getTitle())
+                        .build()));
     }
 
     private Long parseItemId(String value) {

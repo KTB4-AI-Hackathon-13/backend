@@ -6,6 +6,7 @@ import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import javax.imageio.ImageIO;
@@ -75,13 +76,32 @@ public class ImageService {
 
     @Transactional(readOnly = true)
     public ImageResult getRandomByCategoryName(String categoryName) {
+        StoredImage image = randomActiveByCategoryName(categoryName);
+        ObjectStorage.SignedUrl signed = storage.signedGetUrl(image.getStorageKey());
+        return new ImageResult(image, signed.url(), signed.expiresAt());
+    }
+
+    /** 계획 확정 저장용. S3 URL 발급 없이 재사용할 카테고리 이미지 ID만 선택한다. */
+    @Transactional(readOnly = true)
+    public Long getRandomImageIdByCategoryName(String categoryName) {
+        return randomActiveByCategoryName(categoryName).getId();
+    }
+
+    /** 첫 작업 완료 시 뒤늦게 퍼즐이 생성되는 경로를 위한 카테고리 이미지 조회. */
+    @Transactional(readOnly = true)
+    public Optional<Long> findRandomImageIdByCategoryId(Long categoryId) {
+        if (categoryId == null) {
+            return Optional.empty();
+        }
+        return images.findRandomActiveByCategoryId(categoryId).map(StoredImage::getId);
+    }
+
+    private StoredImage randomActiveByCategoryName(String categoryName) {
         CategoryType category = CategoryType.fromDisplayName(categoryName)
                 .orElseThrow(() -> new ApiException(ErrorCode.PLAN_INFORMATION_INCOMPLETE,
                         "지원하지 않는 AI 카테고리입니다: " + categoryName));
-        StoredImage image = images.findRandomActiveByCategoryCode(category.code())
+        return images.findRandomActiveByCategoryCode(category.code())
                 .orElseThrow(() -> new ApiException(ErrorCode.IMAGE_NOT_FOUND_IN_CATEGORY));
-        ObjectStorage.SignedUrl signed = storage.signedGetUrl(image.getStorageKey());
-        return new ImageResult(image, signed.url(), signed.expiresAt());
     }
 
     public void delete(String sessionId, Long imageId) {

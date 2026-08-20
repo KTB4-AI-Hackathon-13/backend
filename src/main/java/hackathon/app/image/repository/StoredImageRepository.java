@@ -19,4 +19,15 @@ public interface StoredImageRepository extends JpaRepository<StoredImage, Long> 
             LIMIT 1
             """, nativeQuery = true)
     Optional<StoredImage> findRandomActiveByCategoryCode(@Param("categoryCode") String categoryCode);
+
+    @Query(value = """
+            SELECT i.* FROM images i
+            JOIN categories c ON c.id = i.category_id
+            WHERE i.category_id = :categoryId
+              AND c.is_active = TRUE
+              AND i.deleted_at IS NULL
+            ORDER BY RAND()
+            LIMIT 1
+            """, nativeQuery = true)
+    Optional<StoredImage> findRandomActiveByCategoryId(@Param("categoryId") Long categoryId);
 }

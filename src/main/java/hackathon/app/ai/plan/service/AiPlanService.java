@@ -81,7 +81,8 @@ public class AiPlanService {
         if (response.confirmed()) {
             ImageService.ImageResult image = imageService.getRandomByCategoryName(response.category());
             Long savedScheduleId = confirmedPlanPersistenceService.save(
-                    userId, request.conversationId(), request.goalSummary(), response.category(), response.plan());
+                    userId, request.conversationId(), request.goalSummary(), response.category(), response.plan(),
+                    image.image().getId());
             response = response.withSavedScheduleId(savedScheduleId);
             imageId = image.image().getId();
             imageUrl = image.url();
