@@ -83,6 +83,14 @@ public class UserPreference {
                 likeNotificationEnabled, rankingChangeNotificationEnabled, null);
     }
 
+    /** MVP에서는 공개 범위 선택을 제공하지 않고 항상 PUBLIC을 사용한다. */
+    public void enforceMvpPuzzleVisibility() {
+        if (this.defaultPuzzleVisibility != PuzzleVisibility.PUBLIC) {
+            this.defaultPuzzleVisibility = PuzzleVisibility.PUBLIC;
+            this.updatedAt = LocalDateTime.now();
+        }
+    }
+
     public Long getUserId() { return userId; }
     public int getMaxDailyTasks() { return maxDailyTasks; }
     public boolean isWeekendScheduleEnabled() { return weekendScheduleEnabled; }

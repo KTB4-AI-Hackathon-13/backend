@@ -53,7 +53,8 @@ CREATE TABLE user_preferences (
   weekend_schedule_enabled BOOLEAN NOT NULL DEFAULT TRUE,
   ai_reschedule_enabled BOOLEAN NOT NULL DEFAULT TRUE,
   notification_enabled BOOLEAN NOT NULL DEFAULT TRUE,
-  default_puzzle_visibility ENUM('PUBLIC','PRIVATE') NOT NULL DEFAULT 'PUBLIC',
+  default_puzzle_visibility ENUM('PUBLIC','PRIVATE') NOT NULL DEFAULT 'PUBLIC'
+    COMMENT 'MVP writes PUBLIC only; PRIVATE is reserved for phase 2',
   ranking_participation_enabled BOOLEAN NOT NULL DEFAULT TRUE,
   gallery_nickname_visible BOOLEAN NOT NULL DEFAULT TRUE,
   like_notification_enabled BOOLEAN NOT NULL DEFAULT TRUE,
@@ -266,7 +267,8 @@ CREATE TABLE puzzles (
   image_id BIGINT NULL,
   title VARCHAR(200) NOT NULL,
   status ENUM('IN_PROGRESS','COMPLETED') NOT NULL DEFAULT 'IN_PROGRESS',
-  visibility ENUM('PUBLIC','PRIVATE') NOT NULL DEFAULT 'PUBLIC',
+  visibility ENUM('PUBLIC','PRIVATE') NOT NULL DEFAULT 'PUBLIC'
+    COMMENT 'MVP writes PUBLIC only; PRIVATE is reserved for phase 2',
   completed_at DATETIME NULL,
   created_at DATETIME NOT NULL,
   updated_at DATETIME NOT NULL,
@@ -301,16 +303,19 @@ CREATE TABLE user_daily_metrics (
   id BIGINT NOT NULL AUTO_INCREMENT,
   user_id BIGINT NOT NULL,
   category_id BIGINT NULL COMMENT 'NULL means overall metrics',
+  category_key BIGINT GENERATED ALWAYS AS (COALESCE(category_id, 0)) STORED,
   metric_date DATE NOT NULL,
   planned_item_count INT NOT NULL DEFAULT 0,
   completed_item_count INT NOT NULL DEFAULT 0,
+  planned_minutes INT NOT NULL DEFAULT 0,
+  completed_minutes INT NOT NULL DEFAULT 0,
   puzzle_count INT NOT NULL DEFAULT 0,
   achievement_rate DECIMAL(5,2) NOT NULL DEFAULT 0,
   consecutive_days INT NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL,
   updated_at DATETIME NOT NULL,
   PRIMARY KEY (id),
-  UNIQUE KEY uk_metrics_user_category_date (user_id, category_id, metric_date),
+  UNIQUE KEY uk_metrics_user_category_date (user_id, category_key, metric_date),
   KEY idx_metrics_date_category (metric_date, category_id)
 );
 
@@ -318,9 +323,10 @@ CREATE TABLE ranking_snapshots (
   id BIGINT NOT NULL AUTO_INCREMENT,
   ranking_date DATE NOT NULL,
   ranking_type ENUM('STREAK','COMPLETED_PUZZLES','PUZZLE_PIECES') NOT NULL,
-  period_type ENUM('WEEKLY','MONTHLY','YEARLY') NOT NULL DEFAULT 'WEEKLY',
+  period_type ENUM('DAILY','WEEKLY','MONTHLY','YEARLY','ALL') NOT NULL DEFAULT 'ALL',
   scope ENUM('OVERALL','CATEGORY') NOT NULL,
   category_id BIGINT NULL,
+  category_key BIGINT GENERATED ALWAYS AS (COALESCE(category_id, 0)) STORED,
   user_id BIGINT NOT NULL,
   rank_no INT NOT NULL,
   score DECIMAL(14,2) NOT NULL,
@@ -329,8 +335,12 @@ CREATE TABLE ranking_snapshots (
   achievement_rate DECIMAL(5,2) NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL,
   PRIMARY KEY (id),
-  UNIQUE KEY uk_ranking_user (ranking_date, ranking_type, period_type, scope, category_id, user_id),
-  KEY idx_ranking_lookup (ranking_date, ranking_type, period_type, scope, category_id, rank_no)
+  UNIQUE KEY uk_ranking_user (ranking_date, ranking_type, period_type, scope, category_key, user_id),
+  KEY idx_ranking_lookup (ranking_date, ranking_type, period_type, scope, category_id, rank_no),
+  CONSTRAINT chk_ranking_scope_category CHECK (
+    (scope = 'OVERALL' AND category_id IS NULL)
+    OR (scope = 'CATEGORY' AND category_id IS NOT NULL)
+  )
 );
 
 CREATE TABLE reschedule_results (

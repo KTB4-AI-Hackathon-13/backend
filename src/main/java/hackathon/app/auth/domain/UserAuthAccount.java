@@ -20,4 +20,12 @@ public class UserAuthAccount {
         account.createdAt = LocalDateTime.now(); account.updatedAt = account.createdAt;
         return account;
     }
+    public static UserAuthAccount oauth(Long userId, AuthProvider provider, String providerUserId) {
+        UserAuthAccount account = new UserAuthAccount();
+        account.userId = userId; account.provider = provider;
+        account.providerUserId = providerUserId;
+        account.createdAt = LocalDateTime.now(); account.updatedAt = account.createdAt;
+        return account;
+    }
+    public Long getUserId() { return userId; }
 }

@@ -3,6 +3,8 @@ package hackathon.app.preference.application;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import hackathon.app.auth.application.AuthService;
+import hackathon.app.common.error.ApiException;
+import hackathon.app.common.error.ErrorCode;
 import hackathon.app.preference.domain.PuzzleVisibility;
 import hackathon.app.preference.domain.UserPreference;
 import hackathon.app.preference.domain.UserPreferenceRepository;
@@ -34,13 +36,20 @@ public class UserPreferenceService {
     }
     public UserPreference get(String sessionId) {
         User user = auth.requireUser(sessionId);
-        return preferences.findByUserId(user.getId())
+        UserPreference preference = preferences.findByUserId(user.getId())
             .orElseGet(() -> preferences.save(UserPreference.createDefault(user.getId())));
+        preference.enforceMvpPuzzleVisibility();
+        return preference;
     }
     public UserPreference update(String sessionId, UpdateCommand command) {
         User user = auth.requireUser(sessionId);
+        if (command.defaultPuzzleVisibility() == PuzzleVisibility.PRIVATE) {
+            throw new ApiException(ErrorCode.INVALID_REQUEST,
+                    "MVP에서는 완성 퍼즐 공개 범위를 PUBLIC으로만 사용할 수 있습니다.");
+        }
         UserPreference preference = preferences.findByUserId(user.getId())
             .orElseGet(() -> preferences.save(UserPreference.createDefault(user.getId())));
+        preference.enforceMvpPuzzleVisibility();
         preference.update(command.maxDailyTasks(), command.weekendScheduleEnabled(),
             command.aiRescheduleEnabled(), command.notificationEnabled(),
             command.defaultPuzzleVisibility(), command.rankingParticipationEnabled(),

@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import hackathon.app.ai.plan.dto.BusyDatePayload;
 import hackathon.app.ai.plan.dto.SchedulePlan;
 import java.util.List;
 import java.util.Map;
@@ -15,5 +16,5 @@ public record MessageRequest(
         @NotEmpty Map<String, Object> template_answers,
         @NotNull SchedulePlan current_plan,
         List<String> feedback_history,
-        Object[] busy_dates
+        List<BusyDatePayload> busy_dates
 ) {}

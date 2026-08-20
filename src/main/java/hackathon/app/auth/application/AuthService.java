@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import hackathon.app.auth.domain.AuthSession;
 import hackathon.app.auth.domain.UserAuthAccount;
+import hackathon.app.auth.domain.AuthProvider;
 import hackathon.app.auth.infrastructure.AuthSessionJpaRepository;
 import hackathon.app.auth.infrastructure.UserAuthAccountJpaRepository;
 import hackathon.app.common.error.ApiException;
@@ -54,6 +55,41 @@ public class AuthService {
         }
         user.login();
         return new LoginResult(user, sessions.save(AuthSession.create(user.getId(), userAgent, ipAddress, 7)));
+    }
+    public LoginResult oauthLogin(AuthProvider provider, String providerUserId, String email, boolean emailVerified,
+                                  String nickname, String userAgent, String ipAddress) {
+        Optional<UserAuthAccount> linked = accounts.findByProviderAndProviderUserId(provider, providerUserId);
+        User user;
+        if (linked.isPresent()) {
+            user = users.findById(linked.get().getUserId()).orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
+        } else {
+            String resolvedEmail = emailVerified && email != null && !email.isBlank()
+                    ? email.trim().toLowerCase()
+                    : virtualEmail(provider, providerUserId);
+            user = users.findByEmail(resolvedEmail)
+                    .orElseGet(() -> users.save(User.create(resolvedEmail, null, uniqueNickname(nickname))));
+            accounts.save(UserAuthAccount.oauth(user.getId(), provider, providerUserId));
+        }
+        if (user.getStatus() == UserStatus.SUSPENDED) throw new ApiException(ErrorCode.ACCOUNT_SUSPENDED);
+        if (user.getStatus() != UserStatus.ACTIVE) throw new ApiException(ErrorCode.INVALID_CREDENTIALS);
+        user.login();
+        return new LoginResult(user, sessions.save(AuthSession.create(user.getId(), userAgent, ipAddress, 7)));
+    }
+
+    private String uniqueNickname(String requested) {
+        String base = requested == null || requested.isBlank() ? "카카오사용자" : requested.trim();
+        if (base.length() > 40) base = base.substring(0, 40);
+        String candidate = base;
+        int suffix = 1;
+        while (users.existsByNickname(candidate)) candidate = base + "_" + suffix++;
+        return candidate;
+    }
+    private String virtualEmail(AuthProvider provider, String providerUserId) {
+        if (providerUserId == null || providerUserId.isBlank()) {
+            throw new ApiException(ErrorCode.OAUTH_PROVIDER_UNAVAILABLE);
+        }
+        String safeId = providerUserId.replaceAll("[^A-Za-z0-9_-]", "_");
+        return provider.name().toLowerCase() + "_" + safeId + "@oauth.local";
     }
     public void logout(String sessionId) { if (sessionId != null) sessions.findById(sessionId).ifPresent(AuthSession::revoke); }
     @Transactional(readOnly = true)
