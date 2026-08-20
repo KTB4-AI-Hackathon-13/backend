@@ -45,3 +45,6 @@ out/
 .claude/
 _workspace/
 CLAUDE.md
+
+### 팀 공유 문서(로컬 전용)
+/docs

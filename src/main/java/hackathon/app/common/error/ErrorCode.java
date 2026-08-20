@@ -25,6 +25,7 @@ public enum ErrorCode {
     SCHEDULE_NOT_FOUND(HttpStatus.NOT_FOUND, "스케줄을 찾을 수 없습니다."),
     SCHEDULE_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "작업을 찾을 수 없습니다."),
     INVALID_SCHEDULE_PERIOD(HttpStatus.UNPROCESSABLE_ENTITY, "시작일은 종료일보다 늦을 수 없습니다."),
+    SCHEDULE_PERIOD_TOO_LONG(HttpStatus.UNPROCESSABLE_ENTITY, "스케줄 기간은 최대 30일까지 설정할 수 있습니다."),
     DATE_OUTSIDE_SCHEDULE_PERIOD(HttpStatus.UNPROCESSABLE_ENTITY, "작업 날짜가 스케줄 기간 밖입니다."),
     MAX_DAILY_TASKS_EXCEEDED(HttpStatus.UNPROCESSABLE_ENTITY, "하루 최대 작업 수를 초과했습니다."),
     ITEMS_OUTSIDE_SCHEDULE_PERIOD(HttpStatus.CONFLICT, "변경하려는 기간 밖에 작업이 존재합니다."),
@@ -38,6 +39,9 @@ public enum ErrorCode {
     MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "메시지를 찾을 수 없습니다."),
     CONVERSATION_ARCHIVED(HttpStatus.CONFLICT, "보관된 대화방에는 메시지를 추가할 수 없습니다."),
     INVALID_CONVERSATION_STATUS(HttpStatus.UNPROCESSABLE_ENTITY, "대화방은 ARCHIVED 상태로만 변경할 수 있습니다."),
+    PLAN_INFORMATION_INCOMPLETE(HttpStatus.UNPROCESSABLE_ENTITY, "계획 생성에 필요한 정보가 부족합니다."),
+    AI_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "AI 호출 한도를 초과했습니다."),
+    AI_PROVIDER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "AI 서비스에 일시적으로 연결할 수 없습니다."),
 
     // ===== 이미지 API =====
     IMAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "이미지를 찾을 수 없습니다."),

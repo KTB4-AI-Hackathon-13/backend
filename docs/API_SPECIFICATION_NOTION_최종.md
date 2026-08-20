@@ -129,29 +129,22 @@
 
 # 4. AI 계획 생성·수정 API
 
+BE가 외부 AI 서버에 요청하고 응답을 기다린 뒤, 검증과 저장을 완료한 스케줄을 반환한다. 별도의 생성 상태 조회나 AI → BE 콜백 API는 사용하지 않는다.
+
 | 기능 | Method | URL | 인증 | 주요 요청값 | 주요 응답값 | 연결 테이블 |
 |---|---|---|---:|---|---|---|
-| AI 계획 생성 | POST | `/schedules/ai-generations` | O | `conversationId`, `title`, `categoryId?` | `generationId`, `status=PENDING` | ERD 추가 필요 |
-| 생성 상태 조회 | GET | `/schedules/ai-generations/{generationId}` | O | 없음 | `status`, `scheduleId?`, `failureReason?` | ERD 추가 필요 |
-| AI 계획 수정 | POST | `/schedules/{scheduleId}/ai-revisions` | O | `instruction`, `conversationId` | `generationId`, `status=PENDING` | 생성 작업, 변경 이력 |
+| ✅ AI 계획 생성 | POST | `/schedules/ai-generations` | O | `conversationId`, `title`, `categoryId` | 저장 완료된 스케줄 상세(200) | `schedules`, `schedule_items` |
+| ✅ AI 계획 수정 | POST | `/schedules/{scheduleId}/ai-revisions` | O | `instruction`, `conversationId` | 수정 완료된 스케줄 상세(200) | 생성 작업, 변경 이력 |
 
-### AI 생성 상태
-
-| 상태 | 의미 |
-|---|---|
-| `PENDING` | 생성 대기 |
-| `RUNNING` | AI 생성 중 |
-| `SUCCEEDED` | 생성 성공 |
-| `FAILED` | 생성 실패 |
+AI 응답의 `estimated_min`은 `schedule_items.estimated_minutes`, `summary`는 `schedules.description`에 저장한다. 외부 AI 설정은 `AI_BASE_URL`, `AI_CONNECT_TIMEOUT_SECONDS`, `AI_READ_TIMEOUT_SECONDS`를 사용한다.
 
 ### AI 계획 오류
 
 | 오류 코드 | HTTP | 조건 |
 |---|---:|---|
 | `PLAN_INFORMATION_INCOMPLETE` | 422 | 계획 생성 정보 부족 |
-| `GENERATION_NOT_FOUND` | 404 | 생성 작업 없음 |
-| `GENERATION_ALREADY_RUNNING` | 409 | 동일 요청 처리 중 |
-| `AI_GENERATION_FAILED` | 503 | AI 계획 생성 실패 |
+| `AI_RATE_LIMITED` | 429 | 외부 AI 호출 한도 초과 |
+| `AI_PROVIDER_UNAVAILABLE` | 503 | 외부 AI 연결 실패, 제한 시간 초과 또는 오류 응답 |
 
 # 5. 스케줄 API
 
@@ -288,6 +281,44 @@ WHERE schedule_id = :schedule_id
 | 파일 저장 | 오브젝트 스토리지 |
 | DB 저장 | 경로와 메타데이터만 저장 |
 
+### 서명 URL(만료) 🆕
+
+업로드·조회 응답의 `url`은 영구 링크가 아니라 매 요청마다 새로 발급하는 S3 서명(presigned) URL이다.
+`urlExpiresAt`(기본 발급 후 10분) 이후에는 이 URL로 접근할 수 없다.
+
+| 항목 | 내용 |
+|---|---|
+| 만료 시간 | 기본 10분 (서버 설정값, 응답의 `urlExpiresAt`로 매번 확인) |
+| 캐싱 여부 | 프론트에서 `url`을 저장해두고 재사용하지 말 것 |
+| 갱신 방법 | 화면에 다시 표시할 때마다 `GET /images/{imageId}`를 호출해 새 서명 URL을 받는다 |
+
+### 소유권 규칙 🆕
+
+업로드·조회·삭제 모두 `ownerType` + `ownerId`가 **로그인한 사용자 소유의 실제 리소스**를 가리켜야 한다.
+즉 부모 리소스(스케줄·작업·퍼즐 등)를 먼저 만들어 id를 받은 뒤, 그 id로 이미지를 업로드하는 순서여야 한다.
+
+| `ownerType` | `ownerId`가 가리키는 것 | 검증 기준 |
+|---|---|---|
+| `USER` | 자기 자신의 회원 id | `ownerId == 내 userId` |
+| `SCHEDULE` | 내 스케줄 id | `schedules.user_id == 내 userId` |
+| `SCHEDULE_ITEM` | 내 스케줄에 속한 작업 id | 상위 `schedules.user_id == 내 userId` |
+| `MESSAGE` | 내 대화에 속한 메시지 id | 상위 `conversations.user_id == 내 userId` |
+| `PUZZLE` | 내 퍼즐 id | `puzzles.user_id == 내 userId` |
+
+기준을 만족하지 않으면 업로드 시점에 `IMAGE_ACCESS_DENIED`(403)로 거부된다.
+
+### 이미지 오류 🆕
+
+| 오류 코드 | HTTP | 조건 |
+|---|---:|---|
+| `IMAGE_NOT_FOUND` | 404 | 이미지 없음(또는 이미 삭제됨) |
+| `IMAGE_ACCESS_DENIED` | 403 | 본인 소유가 아니거나 `ownerId`가 내 리소스가 아님 |
+| `IMAGE_FILE_REQUIRED` | 400 | `file` 파트가 없거나 빈 파일 |
+| `IMAGE_TOO_LARGE` | 413 | 10MB 초과 |
+| `UNSUPPORTED_IMAGE_TYPE` | 415 | PNG, JPEG, WebP 이외 형식 |
+| `INVALID_IMAGE_FILE` | 422 | 확장자·MIME은 맞지만 이미지 디코딩 실패(손상 파일) |
+| `IMAGE_STORAGE_FAILED` | 500 | 오브젝트 스토리지 업로드·삭제·서명 URL 발급 실패 |
+
 # 9. 랭킹 API
 
 | 기능 | Method | URL | 인증 | 주요 요청값 | 주요 응답값 | 연결 테이블 |
@@ -365,7 +396,7 @@ WHERE schedule_id = :schedule_id
 |---|---|
 | MVP-1 | 회원가입, 로그인, 로그아웃 |
 | MVP-2 | AI 대화 저장·조회 |
-| MVP-3 | AI 계획 생성과 생성 상태 조회 |
+| MVP-3 | 동기식 AI 계획 생성 |
 | MVP-4 | 스케줄·작업 CRUD |
 | MVP-5 | 캘린더와 오늘 할 일 |
 | MVP-6 | 작업 완료와 퍼즐 조각 지급 |
