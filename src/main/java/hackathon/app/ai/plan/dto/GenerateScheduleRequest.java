@@ -1,9 +1,9 @@
 package hackathon.app.ai.plan.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
-import java.util.List;
 import java.util.Map;
+
+import jakarta.validation.constraints.Size;
 import tools.jackson.databind.JsonNode;
 
 public record GenerateScheduleRequest(
