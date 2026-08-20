@@ -6,6 +6,7 @@ import java.util.Optional;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -25,7 +26,7 @@ public interface RankingSnapshotRepository extends JpaRepository<RankingSnapshot
         where s.rankingType = :type
           and s.periodType = :period
           and s.scope = :scope
-          and (:categoryId is null or s.categoryId = :categoryId)
+          and ((:categoryId is null and s.categoryId is null) or s.categoryId = :categoryId)
         """)
     LocalDate findLatestRankingDate(@Param("type") RankingType type,
                                     @Param("period") PeriodType period,
@@ -38,7 +39,7 @@ public interface RankingSnapshotRepository extends JpaRepository<RankingSnapshot
           and s.rankingType = :type
           and s.periodType = :period
           and s.scope = :scope
-          and (:categoryId is null or s.categoryId = :categoryId)
+          and ((:categoryId is null and s.categoryId is null) or s.categoryId = :categoryId)
         order by s.rankNo asc
         """)
     List<RankingSnapshot> findTopRankings(@Param("date") LocalDate date,
@@ -54,7 +55,7 @@ public interface RankingSnapshotRepository extends JpaRepository<RankingSnapshot
           and s.rankingType = :type
           and s.periodType = :period
           and s.scope = :scope
-          and (:categoryId is null or s.categoryId = :categoryId)
+          and ((:categoryId is null and s.categoryId is null) or s.categoryId = :categoryId)
           and s.userId = :userId
         """)
     Optional<RankingSnapshot> findByUser(@Param("date") LocalDate date,
@@ -70,11 +71,23 @@ public interface RankingSnapshotRepository extends JpaRepository<RankingSnapshot
           and s.rankingType = :type
           and s.periodType = :period
           and s.scope = :scope
-          and (:categoryId is null or s.categoryId = :categoryId)
+          and ((:categoryId is null and s.categoryId is null) or s.categoryId = :categoryId)
         """)
     long countParticipants(@Param("date") LocalDate date,
                            @Param("type") RankingType type,
                            @Param("period") PeriodType period,
                            @Param("scope") RankingScope scope,
                            @Param("categoryId") Long categoryId);
+
+    @Query("select max(s.rankingDate) from RankingSnapshot s")
+    LocalDate findLatestSnapshotDate();
+
+    boolean existsByRankingDateAndRankingTypeAndPeriodTypeAndScopeAndCategoryIdIsNull(
+            LocalDate rankingDate,
+            RankingType rankingType,
+            PeriodType periodType,
+            RankingScope scope);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    int deleteByRankingDate(LocalDate rankingDate);
 }

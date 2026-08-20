@@ -65,6 +65,7 @@ CREATE TABLE user_preferences (
 
 CREATE TABLE categories (
   id BIGINT NOT NULL AUTO_INCREMENT,
+  code VARCHAR(30) NOT NULL,
   name VARCHAR(80) NOT NULL,
   description VARCHAR(500) NULL,
   icon_url VARCHAR(1000) NULL,
@@ -73,6 +74,7 @@ CREATE TABLE categories (
   created_at DATETIME NOT NULL,
   updated_at DATETIME NOT NULL,
   PRIMARY KEY (id),
+  UNIQUE KEY uk_categories_code (code),
   UNIQUE KEY uk_categories_name (name)
 );
 
@@ -120,13 +122,15 @@ CREATE TABLE schedules (
 
 CREATE TABLE schedule_items (
   id BIGINT NOT NULL AUTO_INCREMENT,
-  schedule_id BIGINT NOT NULL,
+  schedule_id BIGINT NULL,
+  user_id BIGINT NOT NULL,
   category_id BIGINT NULL,
   parent_item_id BIGINT NULL,
   title VARCHAR(200) NOT NULL,
   description TEXT NULL,
   scheduled_date DATE NOT NULL COMMENT 'Date on which AI assigned the task',
-  workload INT NOT NULL DEFAULT 1 COMMENT 'Relative task weight',
+  workload INT NULL COMMENT 'Optional relative task weight',
+  estimated_minutes INT NOT NULL DEFAULT 30 COMMENT 'Required estimated task duration in minutes',
   priority TINYINT NOT NULL DEFAULT 3 COMMENT '1 highest, 5 lowest',
   status ENUM('TODO','IN_PROGRESS','COMPLETED','SKIPPED','CANCELLED') NOT NULL DEFAULT 'TODO',
   source ENUM('USER','AI','RESCHEDULE_BATCH') NOT NULL DEFAULT 'USER',
@@ -137,6 +141,7 @@ CREATE TABLE schedule_items (
   deleted_at DATETIME NULL,
   PRIMARY KEY (id),
   KEY idx_items_schedule_date (schedule_id, scheduled_date),
+  KEY idx_items_user_date (user_id, scheduled_date),
   KEY idx_items_category_status (category_id, status),
   KEY idx_items_parent (parent_item_id)
 );
@@ -160,7 +165,7 @@ CREATE TABLE batch_jobs (
 
 CREATE TABLE schedule_change_logs (
   id BIGINT NOT NULL AUTO_INCREMENT,
-  schedule_id BIGINT NOT NULL,
+  schedule_id BIGINT NULL,
   schedule_item_id BIGINT NULL,
   actor_user_id BIGINT NULL,
   action ENUM('CREATE','UPDATE','DELETE','RESTORE','RESCHEDULE') NOT NULL,
@@ -198,6 +203,7 @@ CREATE TABLE conversation_messages (
   parent_message_id CHAR(36) NULL COMMENT 'Previous message in the selected conversation branch',
   sequence_no INT NOT NULL COMMENT 'Stable message order within a conversation',
   role ENUM('SYSTEM','USER','ASSISTANT','TOOL') NOT NULL,
+  action VARCHAR(30) NULL COMMENT 'template, reject, plan_turn, plan_confirmed',
   content LONGTEXT NULL,
   replaces_message_id CHAR(36) NULL COMMENT 'Original message retained when user edits a message',
   model_name VARCHAR(100) NULL,
@@ -234,6 +240,7 @@ CREATE TABLE ai_generation_jobs (
 CREATE TABLE images (
   id BIGINT NOT NULL AUTO_INCREMENT,
   uploader_user_id BIGINT NOT NULL,
+  category_id BIGINT NULL,
   owner_type ENUM('USER','MESSAGE','SCHEDULE','SCHEDULE_ITEM','PUZZLE') NOT NULL,
   owner_id VARCHAR(100) NOT NULL COMMENT 'Polymorphic owner id; application validates target',
   storage_key VARCHAR(700) NOT NULL COMMENT 'S3-compatible object storage key',
@@ -248,7 +255,8 @@ CREATE TABLE images (
   PRIMARY KEY (id),
   UNIQUE KEY uk_images_storage_key (storage_key),
   KEY idx_images_owner (owner_type, owner_id),
-  KEY idx_images_uploader (uploader_user_id)
+  KEY idx_images_uploader (uploader_user_id),
+  KEY idx_images_category (category_id)
 );
 
 CREATE TABLE puzzles (
@@ -361,6 +369,7 @@ ALTER TABLE schedules
 
 ALTER TABLE schedule_items
   ADD CONSTRAINT fk_item_schedule FOREIGN KEY (schedule_id) REFERENCES schedules (id),
+  ADD CONSTRAINT fk_item_user FOREIGN KEY (user_id) REFERENCES users (id),
   ADD CONSTRAINT fk_item_category FOREIGN KEY (category_id) REFERENCES categories (id),
   ADD CONSTRAINT fk_item_parent FOREIGN KEY (parent_item_id) REFERENCES schedule_items (id);
 
@@ -385,7 +394,8 @@ ALTER TABLE ai_generation_jobs
   ADD CONSTRAINT fk_generation_schedule FOREIGN KEY (schedule_id) REFERENCES schedules (id);
 
 ALTER TABLE images
-  ADD CONSTRAINT fk_image_uploader FOREIGN KEY (uploader_user_id) REFERENCES users (id);
+  ADD CONSTRAINT fk_image_uploader FOREIGN KEY (uploader_user_id) REFERENCES users (id),
+  ADD CONSTRAINT fk_image_category FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE SET NULL;
 
 ALTER TABLE users
   ADD CONSTRAINT fk_user_profile_image FOREIGN KEY (profile_image_id) REFERENCES images (id);

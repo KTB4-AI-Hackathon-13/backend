@@ -11,7 +11,7 @@ import hackathon.app.domain.scheduleitem.dto.ScheduleItemStatusResponse;
 import hackathon.app.domain.scheduleitem.dto.ScheduleItemUpdateRequest;
 import hackathon.app.domain.scheduleitem.entity.ScheduleItem;
 import hackathon.app.domain.scheduleitem.entity.ScheduleItemStatus;
-import hackathon.app.domain.scheduleitem.policy.CategoryChecker;
+import hackathon.app.domain.scheduleitem.entity.ScheduleItemType;
 import hackathon.app.domain.scheduleitem.policy.DailyTaskLimitProvider;
 import hackathon.app.domain.scheduleitem.policy.PuzzlePieceAwarder;
 import hackathon.app.domain.scheduleitem.repository.ScheduleItemRepository;
@@ -46,9 +46,34 @@ public class ScheduleItemService {
     private final ScheduleService scheduleService;
     private final ScheduleChangeLogger changeLogger;
     private final DailyTaskLimitProvider dailyTaskLimitProvider;
-    private final CategoryChecker categoryChecker;
     private final PuzzlePieceAwarder puzzlePieceAwarder;
     private final Clock clock;
+
+    /** POST /schedule-items — 스케줄에 소속되지 않은 단독 작업 생성 */
+    @Transactional
+    public ScheduleItemResponse createStandaloneItem(Long userId, ScheduleItemCreateRequest request) {
+        validateDailyLimit(userId, request.scheduledDate(), NO_EXCLUDE);
+        validateEstimatedMinutes(request.estimatedMinutes());
+        ScheduleItemType itemType = ScheduleItemType.from(request.itemType());
+        int position = request.position() != null
+                ? request.position()
+                : scheduleItemRepository.nextStandalonePosition(userId, request.scheduledDate());
+        ScheduleItem item = scheduleItemRepository.save(ScheduleItem.builder()
+                .schedule(null)
+                .userId(userId)
+                .title(request.title())
+                .description(request.description())
+                .scheduledDate(request.scheduledDate())
+                .estimatedMinutes(request.estimatedMinutes())
+                .itemType(itemType)
+                .priority(3)
+                .position(position)
+                .source(ChangeSource.USER)
+                .build());
+        changeLogger.log(null, item.getId(), userId, ChangeAction.CREATE, ChangeSource.USER,
+                1, null, snapshot(item), null);
+        return ScheduleItemResponse.from(item);
+    }
 
     /** POST /schedules/{scheduleId}/items */
     @Transactional
@@ -57,7 +82,8 @@ public class ScheduleItemService {
 
         validateDateInPeriod(schedule, request.scheduledDate());
         validateDailyLimit(userId, request.scheduledDate(), NO_EXCLUDE);
-        validateCategory(request.categoryId());
+        validateEstimatedMinutes(request.estimatedMinutes());
+        ScheduleItemType itemType = ScheduleItemType.from(request.itemType());
 
         int position = request.position() != null
                 ? request.position()
@@ -65,12 +91,13 @@ public class ScheduleItemService {
 
         ScheduleItem item = scheduleItemRepository.save(ScheduleItem.builder()
                 .schedule(schedule)
-                .categoryId(request.categoryId())
+                .userId(userId)
                 .title(request.title())
                 .description(request.description())
                 .scheduledDate(request.scheduledDate())
-                .workload(request.workload())
-                .priority(request.priority())
+                .estimatedMinutes(request.estimatedMinutes())
+                .itemType(itemType)
+                .priority(3)
                 .position(position)
                 .source(ChangeSource.USER)
                 .build());
@@ -93,19 +120,21 @@ public class ScheduleItemService {
         Schedule schedule = item.getSchedule();
 
         if (request.scheduledDate() != null && !request.scheduledDate().equals(item.getScheduledDate())) {
-            validateDateInPeriod(schedule, request.scheduledDate());
+            if (schedule != null) validateDateInPeriod(schedule, request.scheduledDate());
             validateDailyLimit(userId, request.scheduledDate(), item.getId());
         }
-        validateCategory(request.categoryId());
+        if (request.estimatedMinutes() != null) validateEstimatedMinutes(request.estimatedMinutes());
+        ScheduleItemType itemType = request.itemType() == null ? null : ScheduleItemType.from(request.itemType());
 
         Map<String, Object> before = snapshot(item);
-        item.update(request.title(), request.description(), request.scheduledDate(), request.categoryId(),
-                request.workload(), request.priority(), request.position());
+        item.update(request.title(), request.description(), request.scheduledDate(),
+                request.estimatedMinutes(), itemType, null, request.position());
         Map<String, Object> after = snapshot(item);
 
-        schedule.increaseVersion();
-        changeLogger.log(schedule.getId(), item.getId(), userId, ChangeAction.UPDATE, ChangeSource.USER,
-                schedule.getCurrentVersion(), before, after, null);
+        if (schedule != null) schedule.increaseVersion();
+        changeLogger.log(schedule == null ? null : schedule.getId(), item.getId(), userId,
+                ChangeAction.UPDATE, ChangeSource.USER,
+                schedule == null ? 1 : schedule.getCurrentVersion(), before, after, null);
 
         return ScheduleItemResponse.from(item);
     }
@@ -119,12 +148,12 @@ public class ScheduleItemService {
         item.changeStatus(newStatus, now);
 
         PuzzlePieceAwarder.AwardResult award;
-        if (newStatus == ScheduleItemStatus.COMPLETED) {
+        if (newStatus == ScheduleItemStatus.COMPLETED && item.getSchedule() != null) {
             award = puzzlePieceAwarder.awardOnComplete(item);
         } else {
             award = PuzzlePieceAwarder.AwardResult.none();
             // CANCELLED 로 바뀌면 유효한 작업 수가 줄어 퍼즐이 완성될 수 있다
-            puzzlePieceAwarder.refreshOnItemsChanged(item.getSchedule());
+            if (item.getSchedule() != null) puzzlePieceAwarder.refreshOnItemsChanged(item.getSchedule());
         }
 
         return ScheduleItemStatusResponse.of(item, award);
@@ -140,10 +169,12 @@ public class ScheduleItemService {
         Map<String, Object> before = snapshot(item);
         item.softDelete(now);
 
-        schedule.increaseVersion();
-        changeLogger.log(schedule.getId(), item.getId(), userId, ChangeAction.DELETE, ChangeSource.USER,
-                schedule.getCurrentVersion(), before, Map.of("deletedAt", now.toString()), null);
-        puzzlePieceAwarder.refreshOnItemsChanged(schedule);   // 조각 수가 줄어 퍼즐이 완성될 수 있다
+        if (schedule != null) schedule.increaseVersion();
+        changeLogger.log(schedule == null ? null : schedule.getId(), item.getId(), userId,
+                ChangeAction.DELETE, ChangeSource.USER,
+                schedule == null ? 1 : schedule.getCurrentVersion(), before,
+                Map.of("deletedAt", now.toString()), null);
+        if (schedule != null) puzzlePieceAwarder.refreshOnItemsChanged(schedule);
     }
 
     // ===== 내부 헬퍼 =====
@@ -156,7 +187,7 @@ public class ScheduleItemService {
     public ScheduleItem getOwnedItem(Long userId, Long itemId) {
         ScheduleItem item = scheduleItemRepository.findWithScheduleById(itemId)
                 .orElseThrow(() -> new ApiException(ErrorCode.SCHEDULE_ITEM_NOT_FOUND));
-        if (!item.getSchedule().isOwnedBy(userId)) {
+        if (!item.getUserId().equals(userId)) {
             throw new ApiException(ErrorCode.FORBIDDEN);
         }
         return item;
@@ -180,9 +211,9 @@ public class ScheduleItemService {
         }
     }
 
-    private void validateCategory(Long categoryId) {
-        if (categoryId != null && !categoryChecker.existsActive(categoryId)) {
-            throw new ApiException(ErrorCode.INVALID_REQUEST, "존재하지 않거나 사용 중지된 카테고리입니다: " + categoryId);
+    private void validateEstimatedMinutes(Integer estimatedMinutes) {
+        if (estimatedMinutes == null || estimatedMinutes < 1 || estimatedMinutes > 1440) {
+            throw new ApiException(ErrorCode.INVALID_ESTIMATED_MINUTES);
         }
     }
 
@@ -191,8 +222,8 @@ public class ScheduleItemService {
         m.put("title", i.getTitle());
         m.put("description", i.getDescription());
         m.put("scheduledDate", i.getScheduledDate().toString());
-        m.put("categoryId", i.getCategoryId());
-        m.put("workload", i.getWorkload());
+        m.put("estimatedMinutes", i.getEstimatedMinutes());
+        m.put("itemType", i.getItemType().name());
         m.put("priority", i.getPriority());
         m.put("position", i.getPosition());
         m.put("status", i.getStatus().name());

@@ -42,6 +42,21 @@ public class ConversationController {
     @ResponseStatus(HttpStatus.CREATED)
     ApiResponse<MessageExchangeResponse> send(@LoginUser LoginUserInfo loginUser, @PathVariable String conversationId,
             @Valid @RequestBody MessageRequest body) {
-        return ApiResponse.of(service.send(loginUser.userId(), conversationId, body.message()));
+        return ApiResponse.of(service.send(loginUser.userId(), conversationId, body.content()));
+    }
+
+    @PostMapping("/{conversationId}/messages/{messageId}/revisions")
+    @ResponseStatus(HttpStatus.CREATED)
+    ApiResponse<MessageExchangeResponse> revise(@LoginUser LoginUserInfo loginUser,
+            @PathVariable String conversationId, @PathVariable String messageId,
+            @Valid @RequestBody MessageRequest body) {
+        return ApiResponse.of(service.revise(loginUser.userId(), conversationId, messageId, body.content()));
+    }
+
+    @PatchMapping("/{conversationId}")
+    ApiResponse<ConversationResponse> archive(@LoginUser LoginUserInfo loginUser,
+            @PathVariable String conversationId,
+            @Valid @RequestBody UpdateConversationRequest body) {
+        return ApiResponse.of(service.archive(loginUser.userId(), conversationId, body.status()));
     }
 }

@@ -41,6 +41,10 @@ public class Conversation {
 
     public void archive(LocalDateTime now) { status = ConversationStatus.ARCHIVED; updatedAt = now; }
     public void messageAdded(LocalDateTime now) { lastMessageAt = now; updatedAt = now; }
+    public void linkSchedule(Long scheduleId, LocalDateTime now) {
+        this.scheduleId = scheduleId;
+        this.updatedAt = now;
+    }
     public String getId() { return id; }
     public Long getOwnerUserId() { return ownerUserId; }
     public Long getScheduleId() { return scheduleId; }

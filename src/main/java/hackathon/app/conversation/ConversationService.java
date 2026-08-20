@@ -14,12 +14,15 @@ public class ConversationService {
     private final ConversationRepository conversations;
     private final ConversationMessageRepository messages;
     private final Clock clock;
+    private final tools.jackson.databind.ObjectMapper objectMapper;
 
     public ConversationService(ConversationRepository conversations, ConversationMessageRepository messages,
             Clock clock) {
+            AiConversationClient ai, Clock clock, tools.jackson.databind.ObjectMapper objectMapper) {
         this.conversations = conversations;
         this.messages = messages;
         this.clock = clock;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional
@@ -78,12 +81,17 @@ public class ConversationService {
         int sequence = messages.findMaxSequenceNo(conversation.getId()) + 1;
         LocalDateTime userTime = now();
         ConversationMessage userMessage = messages.save(ConversationMessage.create(conversation.getId(), parentId,
-                sequence, MessageRole.USER, content, replacesId, null, null, null, userTime));
-        conversation.messageAdded(userTime);
-
-        // AI 응답은 AiPlanService의 /schedules/templates, /ai-generations,
-        // /ai-revisions 흐름에서 처리한다. 이 엔드포인트는 대화 로그만 저장한다.
-        return new MessageExchangeResponse(MessageResponse.from(userMessage), null, readiness(content));
+                sequence, MessageRole.USER, null, content, replacesId, null, null, null, userTime));
+        AiConversationResult result = ai.reply(content);
+        LocalDateTime assistantTime = now();
+        String payloadJson = result.planDraft() == null ? null : objectMapper.writeValueAsString(result.planDraft());
+        MessageType messageType = payloadJson == null ? MessageType.TEXT : MessageType.PLAN_DRAFT;
+        ConversationMessage assistant = messages.save(ConversationMessage.create(conversation.getId(), userMessage.getId(),
+                sequence + 1, MessageRole.ASSISTANT, messageType, payloadJson,
+                result.action().type().name(), result.content(), null, result.modelName(),
+                result.tokenUsage().promptTokens(), result.tokenUsage().completionTokens(), assistantTime));
+        conversation.messageAdded(assistantTime);
+        return new MessageExchangeResponse(MessageResponse.from(userMessage), MessageResponse.from(assistant), readiness(content));
     }
 
     private PlanReadinessResponse readiness(String content) {

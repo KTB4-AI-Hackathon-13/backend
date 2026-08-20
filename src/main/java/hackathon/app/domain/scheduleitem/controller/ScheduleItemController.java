@@ -31,6 +31,15 @@ public class ScheduleItemController {
 
     private final ScheduleItemService scheduleItemService;
 
+    /** 계획 없이 단독 작업 생성 → 201 */
+    @PostMapping("/schedule-items")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<ScheduleItemResponse> createStandaloneItem(
+            @LoginUser LoginUserInfo loginUser,
+            @Valid @RequestBody ScheduleItemCreateRequest request) {
+        return ApiResponse.of(scheduleItemService.createStandaloneItem(loginUser.userId(), request));
+    }
+
     /** 작업 추가 → 201 */
     @PostMapping("/schedules/{scheduleId}/items")
     @ResponseStatus(HttpStatus.CREATED)

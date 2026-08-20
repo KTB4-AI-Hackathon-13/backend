@@ -15,7 +15,17 @@ public class UserPreferenceService {
         Boolean aiRescheduleEnabled, Boolean notificationEnabled,
         PuzzleVisibility defaultPuzzleVisibility, Boolean rankingParticipationEnabled,
         Boolean galleryNicknameVisible, Boolean likeNotificationEnabled,
-        Boolean rankingChangeNotificationEnabled) {}
+        Boolean rankingChangeNotificationEnabled, Integer dailyAvailableMinutes) {
+        public UpdateCommand(Integer maxDailyTasks, Boolean weekendScheduleEnabled,
+                Boolean aiRescheduleEnabled, Boolean notificationEnabled,
+                PuzzleVisibility defaultPuzzleVisibility, Boolean rankingParticipationEnabled,
+                Boolean galleryNicknameVisible, Boolean likeNotificationEnabled,
+                Boolean rankingChangeNotificationEnabled) {
+            this(maxDailyTasks, weekendScheduleEnabled, aiRescheduleEnabled, notificationEnabled,
+                    defaultPuzzleVisibility, rankingParticipationEnabled, galleryNicknameVisible,
+                    likeNotificationEnabled, rankingChangeNotificationEnabled, null);
+        }
+    }
 
     private final UserPreferenceRepository preferences;
     private final AuthService auth;
@@ -35,7 +45,7 @@ public class UserPreferenceService {
             command.aiRescheduleEnabled(), command.notificationEnabled(),
             command.defaultPuzzleVisibility(), command.rankingParticipationEnabled(),
             command.galleryNicknameVisible(), command.likeNotificationEnabled(),
-            command.rankingChangeNotificationEnabled());
+            command.rankingChangeNotificationEnabled(), command.dailyAvailableMinutes());
         return preference;
     }
 }

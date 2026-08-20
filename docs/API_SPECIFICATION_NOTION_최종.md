@@ -56,6 +56,8 @@
 
 | 기능 | Method | URL | 인증 | 주요 요청값 | 주요 응답값 | 연결 테이블 |
 |---|---|---|---:|---|---|---|
+| ✅ 계획 없이 작업 추가 | POST | `/schedule-items` | O | `title`, `scheduledDate`, `estimatedMinutes`, `description?`, `categoryId?`, `workload?`, `priority?` | `scheduleId=null`인 단독 작업 | `schedule_items`, 변경 이력 |
+| ✅ 사용자 스케줄 생성 | POST | `/schedules` | O | `title`, `description?`, `startDate`, `endDate` | 생성 스케줄, 퍼즐 수 0 | `schedules`, `schedule_change_logs` |
 | 회원가입 | POST | `/auth/signup` | X | `email`, `password`, `passwordConfirmation`, `nickname`, `termsAgreed`, `privacyAgreed` | `userId`, `email`, `nickname` | `users`, `user_auth_accounts` |
 | 로그인 | POST | `/auth/login` | X | `email`, `password` | 사용자 요약, 세션 쿠키 | `users`, `auth_sessions` |
 | 로그아웃 | POST | `/auth/logout` | O | 없음 | 204 | `auth_sessions` |
@@ -134,9 +136,12 @@ BE가 외부 AI 서버에 요청하고 응답을 기다린 뒤, 검증과 저장
 | 기능 | Method | URL | 인증 | 주요 요청값 | 주요 응답값 | 연결 테이블 |
 |---|---|---|---:|---|---|---|
 | ✅ AI 계획 생성 | POST | `/schedules/ai-generations` | O | `conversationId`, `title`, `categoryId` | 저장 완료된 스케줄 상세(200) | `schedules`, `schedule_items` |
-| ✅ AI 계획 수정 | POST | `/schedules/{scheduleId}/ai-revisions` | O | `instruction`, `conversationId` | 수정 완료된 스케줄 상세(200) | 생성 작업, 변경 이력 |
+| ✅ AI 계획 수정 | POST | `/schedules/{scheduleId}/ai-revisions` | O | `conversationId`, `goalSummary`, `category`, `templateAnswers`, `currentPlan`, `userMessage` | 확정 시 저장된 스케줄 ID, AI `category`, 무작위 이미지 URL | `schedules`, `schedule_items`, `categories`, `images` |
 
 AI 응답의 `estimated_min`은 `schedule_items.estimated_minutes`, `summary`는 `schedules.description`에 저장한다. 외부 AI 설정은 `AI_BASE_URL`, `AI_CONNECT_TIMEOUT_SECONDS`, `AI_READ_TIMEOUT_SECONDS`를 사용한다.
+
+`/ai-revisions`에서 외부 AI 응답이 `confirmed: true`이면 응답 최상위 한글 `category`를 Java `CategoryType`으로 검증하고 영문 코드로 변환한다. 활성 `categories.code`가 같은 삭제되지 않은 이미지 중 하나를 무작위로 선택하고 `image_id`, 새 S3 서명 `image_url`, `image_url_expires_at`을 함께 반환한다. 지원 카테고리는 운동·다이어트·음악·공부·어학·커리어·습관·마인드셋·인간관계·취미이다.
+
 
 ### AI 계획 오류
 
@@ -191,7 +196,7 @@ WHERE schedule_id = :schedule_id
 
 | 기능 | Method | URL | 인증 | 주요 요청값 | 주요 응답값 | 연결 테이블 |
 |---|---|---|---:|---|---|---|
-| ✅ 작업 추가 | POST | `/schedules/{scheduleId}/items` | O | `title`, `scheduledDate`, `description?`, `categoryId?`, `workload?`, `priority?`, `position?` 🆕 | 생성된 작업 | `schedule_items` |
+| ✅ 작업 추가 | POST | `/schedules/{scheduleId}/items` | O | `title`, `scheduledDate`, `estimatedMinutes`, `description?`, `categoryId?`, `workload?`, `priority?`, `position?` | 생성된 작업 | `schedule_items` |
 | ✅ 작업 수정 | PATCH | `/schedule-items/{itemId}` | O | 변경할 작업 필드 | 수정된 작업 | `schedule_items`, `schedule_change_logs` |
 | ✅ 작업 상태 변경 | PATCH | `/schedule-items/{itemId}/status` | O | `status` | 완료 시 퍼즐 조각 지급 결과 | `schedule_items`, 퍼즐 조각 테이블 필요 |
 | ✅ 작업 삭제 | DELETE | `/schedule-items/{itemId}` | O | 없음 | 204 | `schedule_items` |
@@ -267,8 +272,8 @@ WHERE schedule_id = :schedule_id
 
 | 기능 | Method | URL | 인증 | Content-Type | 주요 요청값 | 주요 응답값 | 연결 테이블 |
 |---|---|---|---:|---|---|---|---|
-| 이미지 업로드 | POST | `/images` | O | `multipart/form-data` | `file`, `ownerType`, `ownerId` | 이미지 ID·URL·크기 | `images` |
-| 이미지 조회 | GET | `/images/{imageId}` | 권한별 | JSON | 없음 | 메타데이터, 서명 URL | `images` |
+| 이미지 업로드 | POST | `/images` | O | `multipart/form-data` | `file`, `ownerType`, `ownerId`, `categoryId?` | 이미지 ID·URL·크기·카테고리 | `images`, `categories` |
+| 이미지 조회 | GET | `/images/{imageId}` | 권한별 | JSON | 없음 | 메타데이터, categoryId, 서명 URL | `images`, `categories` |
 | 이미지 삭제 | DELETE | `/images/{imageId}` | O | JSON | 없음 | 204 | `images` |
 
 ### 이미지 업로드 제한

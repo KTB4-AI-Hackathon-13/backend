@@ -19,8 +19,8 @@ public final class PuzzleSpecs {
         return (root, query, cb) -> status == null ? null : cb.equal(root.get("status"), status);
     }
 
-    public static Specification<Puzzle> hasVisibility(PuzzleVisibility visibility) {
-        return (root, query, cb) -> cb.equal(root.get("visibility"), visibility);
+    public static Specification<Puzzle> isPublic() {
+        return (root, query, cb) -> cb.equal(root.get("visibility"), PuzzleVisibility.PUBLIC);
     }
 
     /** id 내림차순 페이징에서 커서(마지막 id)보다 작은 행만 */

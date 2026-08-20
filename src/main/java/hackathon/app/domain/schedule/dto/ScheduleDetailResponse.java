@@ -16,6 +16,7 @@ import java.util.Map;
  */
 public record ScheduleDetailResponse(
         Long id,
+        Long categoryId,
         String title,
         ScheduleStatus status,
         LocalDate startDate,
@@ -47,6 +48,7 @@ public record ScheduleDetailResponse(
 
         return new ScheduleDetailResponse(
                 schedule.getId(),
+                schedule.getCategoryId(),
                 schedule.getTitle(),
                 schedule.getStatus(),
                 schedule.getStartDate(),

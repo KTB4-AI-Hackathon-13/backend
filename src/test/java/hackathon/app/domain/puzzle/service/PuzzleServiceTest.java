@@ -9,6 +9,7 @@ import hackathon.app.common.error.ErrorCode;
 import hackathon.app.domain.puzzle.dto.PuzzleDetailResponse;
 import hackathon.app.domain.puzzle.entity.Puzzle;
 import hackathon.app.domain.puzzle.entity.PuzzlePiece;
+import hackathon.app.domain.puzzle.entity.PuzzleVisibility;
 import hackathon.app.domain.puzzle.repository.PuzzlePieceRepository;
 import hackathon.app.domain.puzzle.repository.PuzzleRepository;
 import hackathon.app.domain.schedule.entity.ChangeSource;
@@ -61,7 +62,12 @@ class PuzzleServiceTest {
     }
 
     private Puzzle puzzle(boolean completed) throws Exception {
-        Puzzle p = Puzzle.builder().scheduleId(SCHEDULE_ID).userId(OWNER).title("운동 루틴").build();
+        return puzzle(completed, PuzzleVisibility.PUBLIC);
+    }
+
+    private Puzzle puzzle(boolean completed, PuzzleVisibility visibility) throws Exception {
+        Puzzle p = Puzzle.builder().scheduleId(SCHEDULE_ID).userId(OWNER).title("운동 루틴")
+                .visibility(visibility).build();
         setId(p, PUZZLE_ID);
         if (completed) {
             p.refreshCompletion(2, 2, LocalDateTime.of(2026, 8, 19, 12, 0));
@@ -148,5 +154,17 @@ class PuzzleServiceTest {
         PuzzleDetailResponse res = service.getPuzzle(OTHER, PUZZLE_ID);
 
         assertThat(res.id()).isEqualTo(PUZZLE_ID);
+    }
+
+    @Test
+    @DisplayName("상세: 타인의 비공개 완성 퍼즐은 조회할 수 없다")
+    void getPuzzle_othersCompletedPrivate_forbidden() throws Exception {
+        when(puzzleRepository.findById(PUZZLE_ID))
+                .thenReturn(Optional.of(puzzle(true, PuzzleVisibility.PRIVATE)));
+
+        assertThatThrownBy(() -> service.getPuzzle(OTHER, PUZZLE_ID))
+                .isInstanceOf(ApiException.class)
+                .extracting(e -> ((ApiException) e).errorCode())
+                .isEqualTo(ErrorCode.PUZZLE_NOT_PUBLIC);
     }
 }

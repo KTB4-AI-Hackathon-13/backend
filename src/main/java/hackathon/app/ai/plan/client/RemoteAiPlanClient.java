@@ -20,11 +20,11 @@ public class RemoteAiPlanClient implements AiPlanClient {
     public TemplateResponse generateTemplate(AiTemplatePayload request) {
         return post("/templates", request, TemplateResponse.class);
     }
-    public AiPlanResult generate(AiGeneratePayload request) {
-        return post("/plan/generate", request, AiPlanResult.class);
+    public PlanTurnResponse generate(AiGeneratePayload request) {
+        return post("/plan/generate", request, PlanTurnResponse.class);
     }
-    public AiPlanResult revise(AiRevisePayload request) {
-        return post("/plan/revise", request, AiPlanResult.class);
+    public PlanTurnResponse revise(AiRevisePayload request) {
+        return post("/plan/revise", request, PlanTurnResponse.class);
     }
     private <T> T post(String path, Object body, Class<T> responseType) {
         if (!configured) throw new ApiException(ErrorCode.AI_PROVIDER_UNAVAILABLE);

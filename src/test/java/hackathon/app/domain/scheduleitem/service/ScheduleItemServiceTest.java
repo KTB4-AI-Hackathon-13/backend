@@ -88,6 +88,28 @@ class ScheduleItemServiceTest {
     // ===== 작업 추가 =====
 
     @Test
+    @DisplayName("단독 작업 추가: schedule 없이 userId 소유 작업 생성")
+    void createStandaloneItem_success() throws Exception {
+        when(dailyTaskLimitProvider.maxDailyTasks(USER_ID)).thenReturn(5);
+        when(scheduleItemRepository.countUserItemsOnDate(USER_ID, IN_PERIOD,
+                ScheduleItemStatus.CANCELLED, -1L)).thenReturn(0L);
+        when(scheduleItemRepository.nextStandalonePosition(USER_ID, IN_PERIOD)).thenReturn(0);
+        when(scheduleItemRepository.save(any())).thenAnswer(inv -> {
+            ScheduleItem saved = inv.getArgument(0);
+            setId(saved, 3001L);
+            return saved;
+        });
+
+        ScheduleItemResponse response = service.createStandaloneItem(USER_ID,
+                new ScheduleItemCreateRequest("물 마시기", IN_PERIOD, null, null, null, 30, null, null));
+
+        assertThat(response.id()).isEqualTo(3001L);
+        assertThat(response.scheduleId()).isNull();
+        verify(changeLogger).log(eq(null), eq(3001L), eq(USER_ID), eq(ChangeAction.CREATE),
+                eq(ChangeSource.USER), eq(1), eq(null), any(), eq(null));
+    }
+
+    @Test
     @DisplayName("추가: 기간 안·한도 미만이면 생성, position 은 같은 날짜 다음 순번, CREATE 이력 + 버전 +1")
     void createItem_success() throws Exception {
         when(scheduleService.getOwnedSchedule(USER_ID, SCHEDULE_ID)).thenReturn(schedule);
@@ -102,12 +124,13 @@ class ScheduleItemServiceTest {
         });
 
         ScheduleItemResponse res = service.createItem(USER_ID, SCHEDULE_ID,
-                new ScheduleItemCreateRequest("새 작업", IN_PERIOD, null, null, null, null, null));
+                new ScheduleItemCreateRequest("새 작업", IN_PERIOD, null, null, null, 30, null, null));
 
         assertThat(res.id()).isEqualTo(2002L);
         assertThat(res.position()).isEqualTo(2);
         assertThat(res.status()).isEqualTo(ScheduleItemStatus.TODO);
-        assertThat(res.workload()).isEqualTo(1);   // 기본값
+        assertThat(res.workload()).isNull();       // 선택값
+        assertThat(res.estimatedMinutes()).isEqualTo(30);
         assertThat(res.priority()).isEqualTo(3);   // 기본값
         assertThat(schedule.getCurrentVersion()).isEqualTo(2);
         verify(changeLogger).log(eq(SCHEDULE_ID), eq(2002L), eq(USER_ID), eq(ChangeAction.CREATE),
@@ -120,7 +143,7 @@ class ScheduleItemServiceTest {
         when(scheduleService.getOwnedSchedule(USER_ID, SCHEDULE_ID)).thenReturn(schedule);
 
         assertThatThrownBy(() -> service.createItem(USER_ID, SCHEDULE_ID,
-                new ScheduleItemCreateRequest("x", LocalDate.of(2026, 9, 1), null, null, null, null, null)))
+                new ScheduleItemCreateRequest("x", LocalDate.of(2026, 9, 1), null, null, null, 30, null, null)))
                 .isInstanceOf(ApiException.class)
                 .extracting(e -> ((ApiException) e).errorCode())
                 .isEqualTo(ErrorCode.DATE_OUTSIDE_SCHEDULE_PERIOD);
@@ -135,7 +158,7 @@ class ScheduleItemServiceTest {
         when(scheduleItemRepository.countUserItemsOnDate(any(), any(), any(), anyLong())).thenReturn(5L);
 
         assertThatThrownBy(() -> service.createItem(USER_ID, SCHEDULE_ID,
-                new ScheduleItemCreateRequest("x", IN_PERIOD, null, null, null, null, null)))
+                new ScheduleItemCreateRequest("x", IN_PERIOD, null, null, null, 30, null, null)))
                 .isInstanceOf(ApiException.class)
                 .extracting(e -> ((ApiException) e).errorCode())
                 .isEqualTo(ErrorCode.MAX_DAILY_TASKS_EXCEEDED);
@@ -150,7 +173,7 @@ class ScheduleItemServiceTest {
         when(categoryChecker.existsActive(99L)).thenReturn(false);
 
         assertThatThrownBy(() -> service.createItem(USER_ID, SCHEDULE_ID,
-                new ScheduleItemCreateRequest("x", IN_PERIOD, null, 99L, null, null, null)))
+                new ScheduleItemCreateRequest("x", IN_PERIOD, null, 99L, null, 30, null, null)))
                 .isInstanceOf(ApiException.class)
                 .extracting(e -> ((ApiException) e).errorCode())
                 .isEqualTo(ErrorCode.INVALID_REQUEST);
@@ -165,7 +188,7 @@ class ScheduleItemServiceTest {
         when(scheduleItemRepository.findWithScheduleById(1004L)).thenReturn(Optional.of(it));
 
         assertThatThrownBy(() -> service.updateItem(OTHER_USER_ID, 1004L,
-                new ScheduleItemUpdateRequest("x", null, null, null, null, null, null)))
+                new ScheduleItemUpdateRequest("x", null, null, null, null, null, null, null)))
                 .isInstanceOf(ApiException.class)
                 .extracting(e -> ((ApiException) e).errorCode())
                 .isEqualTo(ErrorCode.FORBIDDEN);
@@ -177,7 +200,7 @@ class ScheduleItemServiceTest {
         when(scheduleItemRepository.findWithScheduleById(999L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.updateItem(USER_ID, 999L,
-                new ScheduleItemUpdateRequest("x", null, null, null, null, null, null)))
+                new ScheduleItemUpdateRequest("x", null, null, null, null, null, null, null)))
                 .isInstanceOf(ApiException.class)
                 .extracting(e -> ((ApiException) e).errorCode())
                 .isEqualTo(ErrorCode.SCHEDULE_ITEM_NOT_FOUND);
@@ -193,7 +216,7 @@ class ScheduleItemServiceTest {
                 ScheduleItemStatus.CANCELLED, 1006L)).thenReturn(4L);
 
         ScheduleItemResponse res = service.updateItem(USER_ID, 1006L,
-                new ScheduleItemUpdateRequest(null, null, LocalDate.of(2026, 8, 25), null, null, null, null));
+                new ScheduleItemUpdateRequest(null, null, LocalDate.of(2026, 8, 25), null, null, null, null, null));
 
         assertThat(res.scheduledDate()).isEqualTo(LocalDate.of(2026, 8, 25));
         assertThat(schedule.getCurrentVersion()).isEqualTo(2);
@@ -208,7 +231,7 @@ class ScheduleItemServiceTest {
         when(scheduleItemRepository.findWithScheduleById(1004L)).thenReturn(Optional.of(it));
 
         service.updateItem(USER_ID, 1004L,
-                new ScheduleItemUpdateRequest("새 제목", null, IN_PERIOD, null, null, null, null));
+                new ScheduleItemUpdateRequest("새 제목", null, IN_PERIOD, null, null, null, null, null));
 
         verify(dailyTaskLimitProvider, never()).maxDailyTasks(any());
         verify(scheduleItemRepository, never()).countUserItemsOnDate(any(), any(), any(), anyLong());
@@ -219,7 +242,7 @@ class ScheduleItemServiceTest {
     @DisplayName("수정: 빈 요청이면 400")
     void updateItem_empty() {
         assertThatThrownBy(() -> service.updateItem(USER_ID, 1004L,
-                new ScheduleItemUpdateRequest(null, null, null, null, null, null, null)))
+                new ScheduleItemUpdateRequest(null, null, null, null, null, null, null, null)))
                 .isInstanceOf(ApiException.class)
                 .extracting(e -> ((ApiException) e).errorCode())
                 .isEqualTo(ErrorCode.INVALID_REQUEST);

@@ -42,8 +42,9 @@ public class RankingController {
             @CookieValue(name = "SESSION", required = false) String sessionId,
             @RequestParam String type,
             @RequestParam(required = false) Long categoryId,
-            @RequestParam(required = false) String period) {
-        return ApiResponse.of(rankingService.getRankings(sessionId, type, categoryId, period));
+            @RequestParam(required = false) String period,
+            @RequestParam(required = false) Integer size) {
+        return ApiResponse.of(rankingService.getRankings(sessionId, type, categoryId, period, size));
     }
 
     // 컨트롤러 안에 둔 핸들러라 이 컨트롤러의 예외만 잡는다.

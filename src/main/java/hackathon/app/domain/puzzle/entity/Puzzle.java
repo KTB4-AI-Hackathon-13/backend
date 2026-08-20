@@ -78,8 +78,8 @@ public class Puzzle extends BaseTimeEntity {
         return this.status == PuzzleStatus.COMPLETED;
     }
 
-    public boolean isPublic() {
-        return this.visibility == PuzzleVisibility.PUBLIC;
+    public void changeVisibility(PuzzleVisibility visibility) {
+        this.visibility = visibility;
     }
 
     /**

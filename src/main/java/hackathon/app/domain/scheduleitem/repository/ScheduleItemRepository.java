@@ -38,9 +38,9 @@ public interface ScheduleItemRepository extends JpaRepository<ScheduleItem, Long
     /** 월별 캘린더 / 오늘 할 일: 사용자의 기간 내 작업 (스케줄 함께 로딩) */
     @Query("""
             SELECT i FROM ScheduleItem i
-            JOIN FETCH i.schedule s
-            WHERE s.userId = :userId
-              AND s.deletedAt IS NULL
+            LEFT JOIN FETCH i.schedule s
+            WHERE i.userId = :userId
+              AND (s IS NULL OR s.deletedAt IS NULL)
               AND i.scheduledDate BETWEEN :from AND :to
             ORDER BY i.scheduledDate ASC, i.position ASC, i.priority ASC, i.id ASC
             """)
@@ -63,9 +63,9 @@ public interface ScheduleItemRepository extends JpaRepository<ScheduleItem, Long
     /** 작업 단건 + 소속 스케줄(미삭제) 함께 로딩. 소유자 검사는 서비스에서 */
     @Query("""
             SELECT i FROM ScheduleItem i
-            JOIN FETCH i.schedule s
+            LEFT JOIN FETCH i.schedule s
             WHERE i.id = :itemId
-              AND s.deletedAt IS NULL
+              AND (s IS NULL OR s.deletedAt IS NULL)
             """)
     Optional<ScheduleItem> findWithScheduleById(@Param("itemId") Long itemId);
 
@@ -75,9 +75,7 @@ public interface ScheduleItemRepository extends JpaRepository<ScheduleItem, Long
      */
     @Query("""
             SELECT COUNT(i) FROM ScheduleItem i
-            JOIN i.schedule s
-            WHERE s.userId = :userId
-              AND s.deletedAt IS NULL
+            WHERE i.userId = :userId
               AND i.scheduledDate = :date
               AND i.status <> :cancelled
               AND i.id <> :excludeItemId
@@ -95,8 +93,48 @@ public interface ScheduleItemRepository extends JpaRepository<ScheduleItem, Long
             """)
     int nextPosition(@Param("scheduleId") Long scheduleId, @Param("date") LocalDate date);
 
+    /** 단독 작업끼리 같은 날짜에서 사용할 다음 표시 순서 */
+    @Query("""
+            SELECT COALESCE(MAX(i.position), -1) + 1 FROM ScheduleItem i
+            WHERE i.schedule IS NULL
+              AND i.userId = :userId
+              AND i.scheduledDate = :date
+            """)
+    int nextStandalonePosition(@Param("userId") Long userId, @Param("date") LocalDate date);
+
+    /** 통계·랭킹을 위한 유효 작업 원본. 소프트 삭제는 @SQLRestriction으로 제외된다. */
+    @Query("""
+            SELECT i.id AS itemId,
+                   i.userId AS userId,
+                   s.id AS scheduleId,
+                   s.categoryId AS categoryId,
+                   i.scheduledDate AS scheduledDate,
+                   i.estimatedMinutes AS workload,
+                   i.status AS status
+            FROM ScheduleItem i
+            LEFT JOIN i.schedule s
+            WHERE i.userId IN :userIds
+            """)
+    List<RankingItemProjection> findRankingItems(@Param("userIds") Collection<Long> userIds);
+
     /** 스케줄 삭제 시 하위 작업 일괄 소프트 삭제 */
     @Modifying(flushAutomatically = true)
     @Query("UPDATE ScheduleItem i SET i.deletedAt = :now WHERE i.schedule.id = :scheduleId AND i.deletedAt IS NULL")
     int softDeleteAllBySchedule(@Param("scheduleId") Long scheduleId, @Param("now") LocalDateTime now);
+
+    interface RankingItemProjection {
+        Long getItemId();
+
+        Long getUserId();
+
+        Long getScheduleId();
+
+        Long getCategoryId();
+
+        LocalDate getScheduledDate();
+
+        Integer getWorkload();
+
+        ScheduleItemStatus getStatus();
+    }
 }
