@@ -22,8 +22,11 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,7 +53,7 @@ public class ConfirmedPlanPersistenceService {
             Schedule existing = scheduleRepository.findById(conversation.getScheduleId())
                     .orElseThrow(() -> new ApiException(ErrorCode.SCHEDULE_NOT_FOUND));
             if (!existing.isOwnedBy(userId)) throw new ApiException(ErrorCode.FORBIDDEN);
-            return existing.getId();
+            return updateExisting(userId, existing, goalSummary, plan);
         }
 
         List<DailyTask> tasks = validate(plan);
@@ -92,6 +95,127 @@ public class ConfirmedPlanPersistenceService {
         return schedule.getId();
     }
 
+    private Long updateExisting(Long userId, Schedule schedule, String goalSummary, SchedulePlan plan) {
+        List<DailyTask> tasks = validate(plan);
+        List<ScheduleItem> existingItems = itemRepository
+                .findBySchedule_IdOrderByScheduledDateAscPositionAscPriorityAscIdAsc(schedule.getId());
+        Map<Long, ScheduleItem> itemsById = new HashMap<>();
+        existingItems.forEach(item -> itemsById.put(item.getId(), item));
+
+        Set<Long> retainedIds = new HashSet<>();
+        Map<LocalDate, Long> proposedCounts = new LinkedHashMap<>();
+        existingItems.stream()
+                .filter(ScheduleItem::isCompleted)
+                .forEach(item -> proposedCounts.merge(item.getScheduledDate(), 1L, Long::sum));
+
+        for (DailyTask task : tasks) {
+            if (task.id() == null || task.id().isBlank()) {
+                proposedCounts.merge(task.scheduled_date(), 1L, Long::sum);
+                continue;
+            }
+            Long itemId = parseItemId(task.id());
+            ScheduleItem item = itemsById.get(itemId);
+            if (item == null) {
+                throw new ApiException(ErrorCode.INVALID_REQUEST,
+                        "현재 계획에 속하지 않은 작업 ID입니다: " + task.id());
+            }
+            if (item.isCompleted()) {
+                throw new ApiException(ErrorCode.INVALID_REQUEST,
+                        "완료한 작업은 AI로 수정할 수 없습니다: " + task.id());
+            }
+            if (!retainedIds.add(itemId)) {
+                throw new ApiException(ErrorCode.INVALID_REQUEST,
+                        "중복된 작업 ID입니다: " + task.id());
+            }
+            proposedCounts.merge(task.scheduled_date(), 1L, Long::sum);
+        }
+        validateExistingDailyLimits(userId, schedule.getId(), proposedCounts);
+
+        LocalDateTime now = LocalDateTime.now(clock);
+        for (DailyTask task : tasks) {
+            if (task.id() == null || task.id().isBlank()) {
+                ScheduleItem created = itemRepository.save(ScheduleItem.builder()
+                        .schedule(schedule)
+                        .title(task.title())
+                        .description(task.description())
+                        .scheduledDate(task.scheduled_date())
+                        .estimatedMinutes(task.estimated_min())
+                        .priority(3)
+                        .position(itemRepository.nextPosition(schedule.getId(), task.scheduled_date()))
+                        .source(ChangeSource.AI)
+                        .build());
+                schedule.increaseVersion();
+                changeLogger.log(schedule.getId(), created.getId(), userId, ChangeAction.CREATE,
+                        ChangeSource.AI, schedule.getCurrentVersion(), null, snapshot(created),
+                        "AI 계획 수정으로 작업 생성");
+                continue;
+            }
+
+            ScheduleItem item = itemsById.get(parseItemId(task.id()));
+            Map<String, Object> before = snapshot(item);
+            boolean rescheduled = !item.getScheduledDate().equals(task.scheduled_date());
+            item.applyAiPlan(task.title(), task.description(), task.scheduled_date(), task.estimated_min());
+            schedule.increaseVersion();
+            changeLogger.log(schedule.getId(), item.getId(), userId,
+                    rescheduled ? ChangeAction.RESCHEDULE : ChangeAction.UPDATE,
+                    ChangeSource.AI, schedule.getCurrentVersion(), before, snapshot(item),
+                    "AI 계획 수정 반영");
+        }
+
+        for (ScheduleItem item : existingItems) {
+            if (item.isCompleted() || item.getStatus() == ScheduleItemStatus.CANCELLED
+                    || retainedIds.contains(item.getId())) {
+                continue;
+            }
+            Map<String, Object> before = snapshot(item);
+            item.softDelete(now);
+            schedule.increaseVersion();
+            changeLogger.log(schedule.getId(), item.getId(), userId, ChangeAction.DELETE,
+                    ChangeSource.AI, schedule.getCurrentVersion(), before, snapshot(item),
+                    "AI 수정 계획에서 제외됨");
+        }
+
+        List<ScheduleItem> activeItems = itemRepository
+                .findBySchedule_IdOrderByScheduledDateAscPositionAscPriorityAscIdAsc(schedule.getId())
+                .stream()
+                .filter(item -> item.getStatus() != ScheduleItemStatus.CANCELLED)
+                .toList();
+        if (!activeItems.isEmpty()) {
+            LocalDate start = activeItems.stream().map(ScheduleItem::getScheduledDate)
+                    .min(LocalDate::compareTo).orElseThrow();
+            LocalDate end = activeItems.stream().map(ScheduleItem::getScheduledDate)
+                    .max(LocalDate::compareTo).orElseThrow();
+            schedule.update(truncate(goalSummary), plan.summary(), start, end, null);
+        }
+        puzzlePieceAwardService.refreshOnItemsChanged(schedule);
+        return schedule.getId();
+    }
+
+    private Long parseItemId(String value) {
+        try {
+            return Long.valueOf(value);
+        } catch (NumberFormatException exception) {
+            throw new ApiException(ErrorCode.INVALID_REQUEST, "올바르지 않은 작업 ID입니다: " + value);
+        }
+    }
+
+    private void validateExistingDailyLimits(Long userId, Long scheduleId,
+            Map<LocalDate, Long> proposedCounts) {
+        int limit = dailyTaskLimitProvider.maxDailyTasks(userId);
+        proposedCounts.forEach((date, count) -> {
+            long outside = itemRepository.countUserItemsOnDateExcludingSchedule(
+                    userId, date, ScheduleItemStatus.CANCELLED, scheduleId);
+            if (outside + count > limit) {
+                throw new ApiException(ErrorCode.MAX_DAILY_TASKS_EXCEEDED,
+                        date + "의 작업 수가 하루 최대 " + limit + "개를 초과합니다.");
+            }
+        });
+    }
+
+    private String truncate(String value) {
+        return value.length() <= 200 ? value : value.substring(0, 200);
+    }
+
     private List<DailyTask> validate(SchedulePlan plan) {
         if (plan == null || plan.summary() == null || plan.summary().isBlank()
                 || plan.daily_tasks() == null || plan.daily_tasks().isEmpty()) {
@@ -128,6 +252,7 @@ public class ConfirmedPlanPersistenceService {
         value.put("description", item.getDescription());
         value.put("scheduledDate", item.getScheduledDate());
         value.put("estimatedMinutes", item.getEstimatedMinutes());
+        value.put("status", item.getStatus());
         return value;
     }
 }

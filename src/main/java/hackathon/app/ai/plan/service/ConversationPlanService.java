@@ -2,7 +2,6 @@ package hackathon.app.ai.plan.service;
 
 import hackathon.app.ai.plan.client.AiPlanClient;
 import hackathon.app.ai.plan.dto.AiRevisePayload;
-import hackathon.app.ai.plan.dto.DailyTask;
 import hackathon.app.ai.plan.dto.PlanTurnResponse;
 import hackathon.app.ai.plan.dto.SchedulePlan;
 import hackathon.app.conversation.ConversationService;
@@ -12,6 +11,7 @@ import hackathon.app.conversation.dto.response.ConversationTurnResponse;
 import hackathon.app.domain.scheduleitem.entity.ScheduleItemStatus;
 import hackathon.app.domain.scheduleitem.repository.ScheduleItemRepository;
 import java.util.List;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -53,13 +53,17 @@ public class ConversationPlanService {
 
     private SchedulePlan remainingPlan(Conversation conversation, SchedulePlan fallback) {
         if (conversation.getScheduleId() == null) return fallback;
-        List<DailyTask> tasks = scheduleItems
+        Set<String> editableTaskIds = scheduleItems
                 .findBySchedule_IdOrderByScheduledDateAscPositionAscPriorityAscIdAsc(
                         conversation.getScheduleId())
                 .stream()
-                .filter(item -> item.getStatus() != ScheduleItemStatus.COMPLETED)
-                .map(item -> new DailyTask(String.valueOf(item.getId()), item.getScheduledDate(),
-                        item.getTitle(), item.getDescription(), item.getEstimatedMinutes()))
+                .filter(item -> item.getStatus() != ScheduleItemStatus.COMPLETED
+                        && item.getStatus() != ScheduleItemStatus.CANCELLED)
+                .map(item -> String.valueOf(item.getId()))
+                .collect(java.util.stream.Collectors.toSet());
+        var tasks = fallback.daily_tasks().stream()
+                .filter(task -> task.id() == null || task.id().isBlank()
+                        || editableTaskIds.contains(task.id()))
                 .toList();
         return new SchedulePlan(fallback.summary(), tasks);
     }
