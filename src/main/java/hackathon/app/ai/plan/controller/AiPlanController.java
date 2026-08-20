@@ -2,7 +2,6 @@ package hackathon.app.ai.plan.controller;
 
 import hackathon.app.ai.plan.dto.GenerateTemplateRequest;
 import hackathon.app.ai.plan.dto.GenerateScheduleRequest;
-import hackathon.app.ai.plan.dto.ReviseScheduleRequest;
 import hackathon.app.ai.plan.dto.TemplateResponse;
 import hackathon.app.ai.plan.dto.PlanTurnResponse;
 import hackathon.app.ai.plan.service.AiPlanService;
@@ -31,12 +30,5 @@ public class AiPlanController {
     public ApiResponse<PlanTurnResponse> generate(@LoginUser LoginUserInfo loginUser,
                                                   @Valid @RequestBody GenerateScheduleRequest request) {
         return ApiResponse.of(aiPlanService.generate(loginUser.userId(), request));
-    }
-
-    @PostMapping("/{scheduleId}/ai-revisions")
-    public ApiResponse<PlanTurnResponse> revise(@LoginUser LoginUserInfo loginUser,
-                                                @PathVariable String scheduleId,
-                                                @Valid @RequestBody ReviseScheduleRequest request) {
-        return ApiResponse.of(aiPlanService.revise(loginUser.userId(), scheduleId, request));
     }
 }
