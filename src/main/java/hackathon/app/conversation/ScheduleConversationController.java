@@ -1,7 +1,7 @@
 package hackathon.app.conversation;
 
 import hackathon.app.common.api.ApiResponse;
-import hackathon.app.conversation.dto.response.ConversationResponse;
+import hackathon.app.conversation.dto.response.ScheduleConversationResponse;
 import hackathon.app.global.auth.LoginUser;
 import hackathon.app.global.auth.LoginUserInfo;
 import hackathon.app.global.common.ApiPaths;
@@ -19,8 +19,9 @@ public class ScheduleConversationController {
 
     /** 이 스케줄을 생성한 AI 대화방 */
     @GetMapping("/{scheduleId}/conversation")
-    public ApiResponse<ConversationResponse> getConversation(@LoginUser LoginUserInfo loginUser,
+    public ApiResponse<ScheduleConversationResponse> getConversation(@LoginUser LoginUserInfo loginUser,
                                                               @PathVariable Long scheduleId) {
-        return ApiResponse.of(conversationService.findBySchedule(loginUser.userId(), scheduleId));
+        return ApiResponse.of(conversationService.findByScheduleWithResumeContext(
+                loginUser.userId(), scheduleId));
     }
 }
