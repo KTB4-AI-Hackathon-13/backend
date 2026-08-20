@@ -19,6 +19,9 @@ public record ScheduleItemCreateRequest(
         Long categoryId,
         @Min(value = 1, message = "workload 는 1 이상이어야 합니다.")
         Integer workload,
+        @NotNull(message = "estimatedMinutes 는 필수입니다.")
+        @Min(value = 1, message = "estimatedMinutes 는 1 이상이어야 합니다.")
+        Integer estimatedMinutes,
         @Min(value = 1, message = "priority 는 1~5 입니다.") @Max(value = 5, message = "priority 는 1~5 입니다.")
         Integer priority,
         @Min(value = 0, message = "position 은 0 이상이어야 합니다.")

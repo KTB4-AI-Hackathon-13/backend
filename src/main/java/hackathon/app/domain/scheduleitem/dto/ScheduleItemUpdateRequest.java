@@ -15,6 +15,8 @@ public record ScheduleItemUpdateRequest(
         Long categoryId,
         @Min(value = 1, message = "workload 는 1 이상이어야 합니다.")
         Integer workload,
+        @Min(value = 1, message = "estimatedMinutes 는 1 이상이어야 합니다.")
+        Integer estimatedMinutes,
         @Min(value = 1, message = "priority 는 1~5 입니다.") @Max(value = 5, message = "priority 는 1~5 입니다.")
         Integer priority,
         @Min(value = 0, message = "position 은 0 이상이어야 합니다.")
@@ -22,6 +24,6 @@ public record ScheduleItemUpdateRequest(
 ) {
     public boolean isEmpty() {
         return title == null && description == null && scheduledDate == null && categoryId == null
-                && workload == null && priority == null && position == null;
+                && workload == null && estimatedMinutes == null && priority == null && position == null;
     }
 }
