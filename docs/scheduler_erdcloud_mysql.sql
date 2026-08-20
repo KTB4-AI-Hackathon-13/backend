@@ -120,13 +120,15 @@ CREATE TABLE schedules (
 
 CREATE TABLE schedule_items (
   id BIGINT NOT NULL AUTO_INCREMENT,
-  schedule_id BIGINT NOT NULL,
+  schedule_id BIGINT NULL,
+  user_id BIGINT NOT NULL,
   category_id BIGINT NULL,
   parent_item_id BIGINT NULL,
   title VARCHAR(200) NOT NULL,
   description TEXT NULL,
   scheduled_date DATE NOT NULL COMMENT 'Date on which AI assigned the task',
-  workload INT NOT NULL DEFAULT 1 COMMENT 'Relative task weight',
+  workload INT NULL COMMENT 'Optional relative task weight',
+  estimated_minutes INT NOT NULL DEFAULT 30 COMMENT 'Required estimated task duration in minutes',
   priority TINYINT NOT NULL DEFAULT 3 COMMENT '1 highest, 5 lowest',
   status ENUM('TODO','IN_PROGRESS','COMPLETED','SKIPPED','CANCELLED') NOT NULL DEFAULT 'TODO',
   source ENUM('USER','AI','RESCHEDULE_BATCH') NOT NULL DEFAULT 'USER',
@@ -137,6 +139,7 @@ CREATE TABLE schedule_items (
   deleted_at DATETIME NULL,
   PRIMARY KEY (id),
   KEY idx_items_schedule_date (schedule_id, scheduled_date),
+  KEY idx_items_user_date (user_id, scheduled_date),
   KEY idx_items_category_status (category_id, status),
   KEY idx_items_parent (parent_item_id)
 );
@@ -160,7 +163,7 @@ CREATE TABLE batch_jobs (
 
 CREATE TABLE schedule_change_logs (
   id BIGINT NOT NULL AUTO_INCREMENT,
-  schedule_id BIGINT NOT NULL,
+  schedule_id BIGINT NULL,
   schedule_item_id BIGINT NULL,
   actor_user_id BIGINT NULL,
   action ENUM('CREATE','UPDATE','DELETE','RESTORE','RESCHEDULE') NOT NULL,
@@ -364,6 +367,7 @@ ALTER TABLE schedules
 
 ALTER TABLE schedule_items
   ADD CONSTRAINT fk_item_schedule FOREIGN KEY (schedule_id) REFERENCES schedules (id),
+  ADD CONSTRAINT fk_item_user FOREIGN KEY (user_id) REFERENCES users (id),
   ADD CONSTRAINT fk_item_category FOREIGN KEY (category_id) REFERENCES categories (id),
   ADD CONSTRAINT fk_item_parent FOREIGN KEY (parent_item_id) REFERENCES schedule_items (id);
 

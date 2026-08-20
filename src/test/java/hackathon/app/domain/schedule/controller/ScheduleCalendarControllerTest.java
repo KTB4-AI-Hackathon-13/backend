@@ -34,7 +34,7 @@ class ScheduleCalendarControllerTest {
     @MockitoBean ScheduleCalendarService calendarService;
 
     private DailyItemResponse item() {
-        return new DailyItemResponse(1004L, 101L, "8월 알고리즘 공부", null, "DP 문제 1개", 0, 3, 1,
+        return new DailyItemResponse(1004L, 101L, "8월 알고리즘 공부", null, "DP 문제 1개", 0, 3, 30, 1,
                 ScheduleItemStatus.TODO, null);
     }
 

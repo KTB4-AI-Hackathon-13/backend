@@ -40,40 +40,40 @@ INSERT INTO schedules (id, user_id, title, description, status, source, start_da
 -- ---------- schedule_items ----------
 -- 101: 8/17~8/30, 오늘(2026-08-19) 포함. 일부 완료, 1건 소프트삭제, 1건 취소(퍼즐 수에서 제외)
 -- position: 8/18 은 1002(0)→1003(1), 8/19 는 1005(0)→1004(1) (priority 와 반대 → position 정렬 검증용)
-INSERT INTO schedule_items (id, schedule_id, category_id, parent_item_id, title, description, scheduled_date, workload, priority, status, source, position, completed_at, created_at, updated_at, deleted_at) VALUES
-  (1001, 101, NULL, NULL, 'BFS 문제 2개',      NULL, '2026-08-17', 2, 2, 'COMPLETED',   'AI', 0, '2026-08-17 21:00:00', '2026-08-16 10:00:00', '2026-08-17 21:00:00', NULL),
-  (1002, 101, NULL, NULL, 'DFS 문제 2개',      NULL, '2026-08-18', 2, 2, 'COMPLETED',   'AI', 0, '2026-08-18 22:00:00', '2026-08-16 10:00:00', '2026-08-18 22:00:00', NULL),
-  (1003, 101, NULL, NULL, 'DP 기초 강의',      NULL, '2026-08-18', 1, 3, 'SKIPPED',     'AI', 1, NULL,                  '2026-08-16 10:00:00', '2026-08-18 23:00:00', NULL),
-  (1004, 101, NULL, NULL, 'DP 문제 1개',       NULL, '2026-08-19', 3, 1, 'TODO',        'AI', 1, NULL,                  '2026-08-16 10:00:00', '2026-08-16 10:00:00', NULL),
-  (1005, 101, NULL, NULL, '그리디 문제 1개',   NULL, '2026-08-19', 1, 3, 'IN_PROGRESS', 'AI', 0, NULL,                  '2026-08-16 10:00:00', '2026-08-19 09:00:00', NULL),
-  (1006, 101, NULL, NULL, '백트래킹 문제 1개', NULL, '2026-08-20', 2, 2, 'TODO',        'AI', 0, NULL,                  '2026-08-16 10:00:00', '2026-08-16 10:00:00', NULL),
-  (1007, 101, NULL, NULL, '복습',              NULL, '2026-08-22', 1, 4, 'TODO',        'AI', 0, NULL,                  '2026-08-16 10:00:00', '2026-08-16 10:00:00', NULL),
-  (1008, 101, NULL, NULL, '삭제된 작업',       NULL, '2026-08-21', 1, 3, 'TODO',        'AI', 0, NULL,                  '2026-08-16 10:00:00', '2026-08-17 00:00:00', '2026-08-17 00:00:00'),
-  (1009, 101, NULL, NULL, '취소된 작업',       NULL, '2026-08-30', 1, 5, 'CANCELLED',   'USER', 0, NULL,                '2026-08-16 10:00:00', '2026-08-18 00:00:00', NULL);
+INSERT INTO schedule_items (id, schedule_id, user_id, category_id, parent_item_id, title, description, scheduled_date, workload, priority, status, source, position, completed_at, created_at, updated_at, deleted_at) VALUES
+  (1001, 101, 1, NULL, NULL, 'BFS 문제 2개',      NULL, '2026-08-17', 2, 2, 'COMPLETED',   'AI', 0, '2026-08-17 21:00:00', '2026-08-16 10:00:00', '2026-08-17 21:00:00', NULL),
+  (1002, 101, 1, NULL, NULL, 'DFS 문제 2개',      NULL, '2026-08-18', 2, 2, 'COMPLETED',   'AI', 0, '2026-08-18 22:00:00', '2026-08-16 10:00:00', '2026-08-18 22:00:00', NULL),
+  (1003, 101, 1, NULL, NULL, 'DP 기초 강의',      NULL, '2026-08-18', 1, 3, 'SKIPPED',     'AI', 1, NULL,                  '2026-08-16 10:00:00', '2026-08-18 23:00:00', NULL),
+  (1004, 101, 1, NULL, NULL, 'DP 문제 1개',       NULL, '2026-08-19', 3, 1, 'TODO',        'AI', 1, NULL,                  '2026-08-16 10:00:00', '2026-08-16 10:00:00', NULL),
+  (1005, 101, 1, NULL, NULL, '그리디 문제 1개',   NULL, '2026-08-19', 1, 3, 'IN_PROGRESS', 'AI', 0, NULL,                  '2026-08-16 10:00:00', '2026-08-19 09:00:00', NULL),
+  (1006, 101, 1, NULL, NULL, '백트래킹 문제 1개', NULL, '2026-08-20', 2, 2, 'TODO',        'AI', 0, NULL,                  '2026-08-16 10:00:00', '2026-08-16 10:00:00', NULL),
+  (1007, 101, 1, NULL, NULL, '복습',              NULL, '2026-08-22', 1, 4, 'TODO',        'AI', 0, NULL,                  '2026-08-16 10:00:00', '2026-08-16 10:00:00', NULL),
+  (1008, 101, 1, NULL, NULL, '삭제된 작업',       NULL, '2026-08-21', 1, 3, 'TODO',        'AI', 0, NULL,                  '2026-08-16 10:00:00', '2026-08-17 00:00:00', '2026-08-17 00:00:00'),
+  (1009, 101, 1, NULL, NULL, '취소된 작업',       NULL, '2026-08-30', 1, 5, 'CANCELLED',   'USER', 0, NULL,                '2026-08-16 10:00:00', '2026-08-18 00:00:00', NULL);
 
 -- 102: 8/20~9/5 (기간 변경 충돌 테스트: 9/3 에 작업 존재)
-INSERT INTO schedule_items (id, schedule_id, category_id, parent_item_id, title, description, scheduled_date, workload, priority, status, source, position, completed_at, created_at, updated_at, deleted_at) VALUES
-  (1101, 102, NULL, NULL, '1강 듣기', NULL, '2026-08-20', 1, 3, 'TODO', 'AI', 0, NULL, '2026-08-18 09:00:00', '2026-08-18 09:00:00', NULL),
-  (1102, 102, NULL, NULL, '2강 듣기', NULL, '2026-08-22', 1, 3, 'TODO', 'AI', 0, NULL, '2026-08-18 09:00:00', '2026-08-18 09:00:00', NULL),
-  (1103, 102, NULL, NULL, '3강 듣기', NULL, '2026-09-03', 1, 3, 'TODO', 'AI', 0, NULL, '2026-08-18 09:00:00', '2026-08-18 09:00:00', NULL);
+INSERT INTO schedule_items (id, schedule_id, user_id, category_id, parent_item_id, title, description, scheduled_date, workload, priority, status, source, position, completed_at, created_at, updated_at, deleted_at) VALUES
+  (1101, 102, 1, NULL, NULL, '1강 듣기', NULL, '2026-08-20', 1, 3, 'TODO', 'AI', 0, NULL, '2026-08-18 09:00:00', '2026-08-18 09:00:00', NULL),
+  (1102, 102, 1, NULL, NULL, '2강 듣기', NULL, '2026-08-22', 1, 3, 'TODO', 'AI', 0, NULL, '2026-08-18 09:00:00', '2026-08-18 09:00:00', NULL),
+  (1103, 102, 1, NULL, NULL, '3강 듣기', NULL, '2026-09-03', 1, 3, 'TODO', 'AI', 0, NULL, '2026-08-18 09:00:00', '2026-08-18 09:00:00', NULL);
 
 -- 103: 7월 완료 스케줄 (전부 COMPLETED)
-INSERT INTO schedule_items (id, schedule_id, category_id, parent_item_id, title, description, scheduled_date, workload, priority, status, source, position, completed_at, created_at, updated_at, deleted_at) VALUES
-  (1201, 103, NULL, NULL, 'Day1 단어 30개', NULL, '2026-07-01', 1, 3, 'COMPLETED', 'USER', 0, '2026-07-01 20:00:00', '2026-06-30 08:00:00', '2026-07-01 20:00:00', NULL),
-  (1202, 103, NULL, NULL, 'Day2 단어 30개', NULL, '2026-07-02', 1, 3, 'COMPLETED', 'USER', 0, '2026-07-02 20:00:00', '2026-06-30 08:00:00', '2026-07-02 20:00:00', NULL);
+INSERT INTO schedule_items (id, schedule_id, user_id, category_id, parent_item_id, title, description, scheduled_date, workload, priority, status, source, position, completed_at, created_at, updated_at, deleted_at) VALUES
+  (1201, 103, 1, NULL, NULL, 'Day1 단어 30개', NULL, '2026-07-01', 1, 3, 'COMPLETED', 'USER', 0, '2026-07-01 20:00:00', '2026-06-30 08:00:00', '2026-07-01 20:00:00', NULL),
+  (1202, 103, 1, NULL, NULL, 'Day2 단어 30개', NULL, '2026-07-02', 1, 3, 'COMPLETED', 'USER', 0, '2026-07-02 20:00:00', '2026-06-30 08:00:00', '2026-07-02 20:00:00', NULL);
 
 -- 104: 운동 (오늘 포함, 8월 캘린더에 섞여서 나와야 함)
-INSERT INTO schedule_items (id, schedule_id, category_id, parent_item_id, title, description, scheduled_date, workload, priority, status, source, position, completed_at, created_at, updated_at, deleted_at) VALUES
-  (1301, 104, NULL, NULL, '하체 운동', NULL, '2026-08-17', 2, 2, 'COMPLETED', 'AI', 0, '2026-08-17 19:00:00', '2026-07-31 20:00:00', '2026-08-17 19:00:00', NULL),
-  (1302, 104, NULL, NULL, '상체 운동', NULL, '2026-08-19', 2, 2, 'TODO',      'AI', 0, NULL,                  '2026-07-31 20:00:00', '2026-07-31 20:00:00', NULL),
-  (1303, 104, NULL, NULL, '유산소',    NULL, '2026-08-21', 1, 3, 'TODO',      'AI', 0, NULL,                  '2026-07-31 20:00:00', '2026-07-31 20:00:00', NULL);
+INSERT INTO schedule_items (id, schedule_id, user_id, category_id, parent_item_id, title, description, scheduled_date, workload, priority, status, source, position, completed_at, created_at, updated_at, deleted_at) VALUES
+  (1301, 104, 1, NULL, NULL, '하체 운동', NULL, '2026-08-17', 2, 2, 'COMPLETED', 'AI', 0, '2026-08-17 19:00:00', '2026-07-31 20:00:00', '2026-08-17 19:00:00', NULL),
+  (1302, 104, 1, NULL, NULL, '상체 운동', NULL, '2026-08-19', 2, 2, 'TODO',      'AI', 0, NULL,                  '2026-07-31 20:00:00', '2026-07-31 20:00:00', NULL),
+  (1303, 104, 1, NULL, NULL, '유산소',    NULL, '2026-08-21', 1, 3, 'TODO',      'AI', 0, NULL,                  '2026-07-31 20:00:00', '2026-07-31 20:00:00', NULL);
 
 -- 105: 소프트삭제된 스케줄의 작업 (캘린더에 나오면 안 됨)
-INSERT INTO schedule_items (id, schedule_id, category_id, parent_item_id, title, description, scheduled_date, workload, priority, status, source, position, completed_at, created_at, updated_at, deleted_at) VALUES
-  (1401, 105, NULL, NULL, '보이면 안 되는 작업', NULL, '2026-08-19', 1, 3, 'TODO', 'USER', 0, NULL, '2026-08-01 00:00:00', '2026-08-02 00:00:00', '2026-08-02 00:00:00');
+INSERT INTO schedule_items (id, schedule_id, user_id, category_id, parent_item_id, title, description, scheduled_date, workload, priority, status, source, position, completed_at, created_at, updated_at, deleted_at) VALUES
+  (1401, 105, 1, NULL, NULL, '보이면 안 되는 작업', NULL, '2026-08-19', 1, 3, 'TODO', 'USER', 0, NULL, '2026-08-01 00:00:00', '2026-08-02 00:00:00', '2026-08-02 00:00:00');
 
 -- 201: tester2
-INSERT INTO schedule_items (id, schedule_id, category_id, parent_item_id, title, description, scheduled_date, workload, priority, status, source, position, completed_at, created_at, updated_at, deleted_at) VALUES
-  (2001, 201, NULL, NULL, 'tester2 작업', NULL, '2026-08-19', 1, 3, 'TODO', 'AI', 0, NULL, '2026-08-10 00:00:00', '2026-08-10 00:00:00', NULL);
+INSERT INTO schedule_items (id, schedule_id, user_id, category_id, parent_item_id, title, description, scheduled_date, workload, priority, status, source, position, completed_at, created_at, updated_at, deleted_at) VALUES
+  (2001, 201, 2, NULL, NULL, 'tester2 작업', NULL, '2026-08-19', 1, 3, 'TODO', 'AI', 0, NULL, '2026-08-10 00:00:00', '2026-08-10 00:00:00', NULL);
 
 SET FOREIGN_KEY_CHECKS = 1;

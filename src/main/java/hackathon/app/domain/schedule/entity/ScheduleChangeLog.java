@@ -32,7 +32,7 @@ public class ScheduleChangeLog {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "schedule_id", nullable = false)
+    @Column(name = "schedule_id")
     private Long scheduleId;
 
     @Column(name = "schedule_item_id")

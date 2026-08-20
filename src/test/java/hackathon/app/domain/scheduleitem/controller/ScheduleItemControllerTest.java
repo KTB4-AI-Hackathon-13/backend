@@ -46,13 +46,29 @@ class ScheduleItemControllerTest {
     }
 
     @Test
+    @DisplayName("POST /schedule-items — 계획 없이 1일 스케줄과 작업 생성")
+    void createStandaloneItem_returns201() throws Exception {
+        ScheduleItemResponse standalone = new ScheduleItemResponse(2002L, null, null, null,
+                "물 마시기", null, LocalDate.of(2026, 8, 19),
+                0, 1, 3, ScheduleItemStatus.TODO, null);
+        when(scheduleItemService.createStandaloneItem(eq(1L), any())).thenReturn(standalone);
+
+        mockMvc.perform(post("/api/v1/schedule-items").header("X-User-Id", "1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"물 마시기\",\"scheduledDate\":\"2026-08-19\",\"estimatedMinutes\":30}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.id").value(2002))
+                .andExpect(jsonPath("$.data.scheduleId").isEmpty());
+    }
+
+    @Test
     @DisplayName("POST /schedules/{id}/items — 201 + 생성된 작업")
     void createItem_returns201() throws Exception {
         when(scheduleItemService.createItem(eq(1L), eq(101L), any())).thenReturn(item());
 
         mockMvc.perform(post("/api/v1/schedules/101/items").header("X-User-Id", "1")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"title\":\"새 작업\",\"scheduledDate\":\"2026-08-19\"}"))
+                        .content("{\"title\":\"새 작업\",\"scheduledDate\":\"2026-08-19\",\"estimatedMinutes\":30}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.id").value(2002))
                 .andExpect(jsonPath("$.data.position").value(2))
@@ -64,7 +80,7 @@ class ScheduleItemControllerTest {
     void createItem_missingTitle_returns400() throws Exception {
         mockMvc.perform(post("/api/v1/schedules/101/items").header("X-User-Id", "1")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"scheduledDate\":\"2026-08-19\"}"))
+                        .content("{\"scheduledDate\":\"2026-08-19\",\"estimatedMinutes\":30}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("title"));
@@ -78,7 +94,7 @@ class ScheduleItemControllerTest {
 
         mockMvc.perform(post("/api/v1/schedules/101/items").header("X-User-Id", "1")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"title\":\"x\",\"scheduledDate\":\"2026-08-19\"}"))
+                        .content("{\"title\":\"x\",\"scheduledDate\":\"2026-08-19\",\"estimatedMinutes\":30}"))
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.code").value("MAX_DAILY_TASKS_EXCEEDED"));
     }
