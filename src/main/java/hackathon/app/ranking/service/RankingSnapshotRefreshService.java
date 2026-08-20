@@ -56,6 +56,53 @@ public class RankingSnapshotRefreshService {
     private final Clock clock;
     private final AtomicReference<LocalDate> lastRefreshDate = new AtomicReference<>();
 
+    /**
+     * 랭킹 조회용 실시간 계산.
+     *
+     * <p>조회 API가 파생 테이블인 ranking_snapshots의 스키마나 배치 성공 여부에 의존하지 않도록
+     * 현재 User, ScheduleItem, Puzzle, PuzzlePiece 엔티티 데이터만 읽어 결과를 만든다.</p>
+     */
+    @Transactional(readOnly = true)
+    public RankingResult calculateCurrent(RankingType type, PeriodType period, Long categoryId) {
+        LocalDate rankingDate = LocalDate.now(clock);
+        List<User> eligibleUsers = eligibleUsers();
+        List<Long> userIds = eligibleUsers.stream().map(User::getId).toList();
+
+        List<ItemFact> items = itemFacts(userIds);
+        Map<Long, Long> itemCategories = items.stream()
+                .filter(item -> item.categoryId() != null)
+                .collect(Collectors.toMap(ItemFact::itemId, ItemFact::categoryId));
+        Map<Long, Set<Long>> scheduleCategories = scheduleCategories(items);
+        List<ActivityFact> activities = activityFacts(userIds, itemCategories, rankingDate);
+        List<CompletedPuzzleFact> completedPuzzles = completedPuzzleFacts(
+                userIds, scheduleCategories, rankingDate);
+
+        ScopeKey scope = categoryId == null
+                ? new ScopeKey(RankingScope.OVERALL, null)
+                : new ScopeKey(RankingScope.CATEGORY, categoryId);
+        RankingPeriodWindow window = RankingPeriodWindow.of(period, rankingDate);
+        Map<Long, UserStats> stats = calculateStats(
+                eligibleUsers, activities, completedPuzzles, items, scope, window);
+        List<ScoreEntry> scoreEntries = rankedEntries(type, eligibleUsers, stats);
+
+        List<RankingResult.Entry> entries = new ArrayList<>();
+        Long previousScore = null;
+        int rank = 0;
+        for (int index = 0; index < scoreEntries.size(); index++) {
+            ScoreEntry entry = scoreEntries.get(index);
+            if (previousScore == null || previousScore.longValue() != entry.score()) {
+                rank = index + 1;
+            }
+            previousScore = entry.score();
+            entries.add(new RankingResult.Entry(
+                    rank,
+                    entry.user().getId(),
+                    entry.user().getNickname(),
+                    BigDecimal.valueOf(entry.score()).setScale(2)));
+        }
+        return new RankingResult(rankingDate, entries);
+    }
+
     /** 첫 조회에서 오늘 스냅샷이 없을 때 한 번만 즉시 생성한다. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public synchronized void refreshIfStale() {
@@ -264,15 +311,7 @@ public class RankingSnapshotRefreshService {
                                                  List<User> users,
                                                  Map<Long, UserStats> stats,
                                                  LocalDate rankingDate) {
-        List<ScoreEntry> entries = users.stream()
-                .map(user -> {
-                    UserStats userStats = stats.get(user.getId());
-                    return new ScoreEntry(user, userStats, score(type, userStats));
-                })
-                .filter(entry -> entry.score() > 0)
-                .sorted(Comparator.comparingLong(ScoreEntry::score).reversed()
-                        .thenComparing(entry -> entry.user().getId()))
-                .toList();
+        List<ScoreEntry> entries = rankedEntries(type, users, stats);
 
         List<RankingSnapshot> snapshots = new ArrayList<>();
         Long previousScore = null;
@@ -301,6 +340,20 @@ public class RankingSnapshotRefreshService {
                     createdAt));
         }
         return snapshots;
+    }
+
+    private List<ScoreEntry> rankedEntries(RankingType type,
+                                           List<User> users,
+                                           Map<Long, UserStats> stats) {
+        return users.stream()
+                .map(user -> {
+                    UserStats userStats = stats.get(user.getId());
+                    return new ScoreEntry(user, userStats, score(type, userStats));
+                })
+                .filter(entry -> entry.score() > 0)
+                .sorted(Comparator.comparingLong(ScoreEntry::score).reversed()
+                        .thenComparing(entry -> entry.user().getId()))
+                .toList();
     }
 
     private long score(RankingType type, UserStats stats) {
