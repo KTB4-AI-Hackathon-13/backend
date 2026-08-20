@@ -10,6 +10,7 @@ import hackathon.app.domain.scheduleitem.entity.ScheduleItemStatus;
 import hackathon.app.domain.scheduleitem.policy.PuzzlePieceAwarder;
 import hackathon.app.domain.scheduleitem.repository.PuzzleCountProjection;
 import hackathon.app.domain.scheduleitem.repository.ScheduleItemRepository;
+import hackathon.app.image.service.ImageService;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -35,6 +36,7 @@ public class PuzzlePieceAwardService implements PuzzlePieceAwarder {
     private final PuzzleRepository puzzleRepository;
     private final PuzzlePieceRepository puzzlePieceRepository;
     private final ScheduleItemRepository scheduleItemRepository;
+    private final ImageService imageService;
     private final Clock clock;
 
     @Override
@@ -48,6 +50,7 @@ public class PuzzlePieceAwardService implements PuzzlePieceAwarder {
                 .orElseGet(() -> puzzleRepository.save(Puzzle.builder()
                         .scheduleId(schedule.getId())
                         .userId(schedule.getUserId())
+                        .imageId(imageService.findRandomImageIdByCategoryId(schedule.getCategoryId()).orElse(null))
                         .title(schedule.getTitle())
                         .build()));
 

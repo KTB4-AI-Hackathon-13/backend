@@ -380,7 +380,7 @@ achievement_rate = completed_item_count / planned_item_count * 100
 | `id` | BIGINT | Y | 랭킹 결과 ID, PK |
 | `ranking_date` | DATE | Y | 랭킹 기준일 |
 | `ranking_type` | ENUM | Y | `STREAK`, `COMPLETED_PUZZLES`, `PUZZLE_PIECES` |
-| `period_type` | ENUM | Y | `DAILY`, `WEEKLY`, `MONTHLY`, `YEARLY`, `ALL` |
+| `period_type` | ENUM | Y | `DAILY`, `WEEKLY`, `MONTHLY`, `ALL` |
 | `scope` | ENUM | Y | `OVERALL`은 전체, `CATEGORY`는 카테고리별 랭킹 |
 | `category_id` | BIGINT | N | 카테고리 랭킹일 때 `categories.id`; 전체 랭킹은 `NULL` |
 | `category_key` | BIGINT | Y | `NULL` 카테고리 유니크 제약을 위한 `COALESCE(category_id, 0)` 생성 컬럼 |

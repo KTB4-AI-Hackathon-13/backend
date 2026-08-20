@@ -15,6 +15,9 @@ public interface PuzzleRepository extends JpaRepository<Puzzle, Long>, JpaSpecif
     /** 스케줄당 퍼즐 1개 (uk_puzzle_schedule) */
     Optional<Puzzle> findByScheduleId(Long scheduleId);
 
+    /** 한 카테고리 이미지를 공유하는 퍼즐들. 이미지 읽기 권한 판정에 사용한다. */
+    List<Puzzle> findAllByImageId(Long imageId);
+
     /** 사용자별 현재 완성 상태인 작품 수. */
     @Query("""
             SELECT p.userId AS userId, COUNT(p) AS puzzleCount

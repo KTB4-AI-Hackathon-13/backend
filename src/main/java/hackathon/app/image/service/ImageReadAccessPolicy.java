@@ -8,7 +8,6 @@ import hackathon.app.common.error.ErrorCode;
 import hackathon.app.domain.puzzle.entity.Puzzle;
 import hackathon.app.domain.puzzle.entity.PuzzleVisibility;
 import hackathon.app.domain.puzzle.repository.PuzzleRepository;
-import hackathon.app.image.entity.ImageOwnerType;
 import hackathon.app.image.entity.StoredImage;
 
 @Component
@@ -22,22 +21,14 @@ public class ImageReadAccessPolicy {
 
     public void check(StoredImage image, Long viewerUserId) {
         if (viewerUserId != null && viewerUserId.equals(image.getUploaderUserId())) return;
-        if (image.getOwnerType() != ImageOwnerType.PUZZLE) throw accessDenied();
 
-        Long puzzleId;
-        try {
-            puzzleId = Long.valueOf(image.getOwnerId());
-        } catch (NumberFormatException exception) {
-            throw accessDenied();
-        }
-
-        Puzzle puzzle = puzzles.findById(puzzleId).orElseThrow(this::accessDenied);
-        if (puzzle.getDeletedAt() != null) {
-            throw accessDenied();
-        }
-        if (puzzle.isOwnedBy(viewerUserId)
-                || (puzzle.isCompleted() && puzzle.getVisibility() == PuzzleVisibility.PUBLIC)) {
-            return;
+        // 카테고리 기본 이미지 한 장을 여러 퍼즐이 공유하므로 images.owner_id가 아니라
+        // 실제 FK인 puzzles.image_id를 기준으로 현재 사용자가 볼 수 있는 퍼즐이 있는지 확인한다.
+        for (Puzzle puzzle : puzzles.findAllByImageId(image.getId())) {
+            if (puzzle.isOwnedBy(viewerUserId)
+                    || (puzzle.isCompleted() && puzzle.getVisibility() == PuzzleVisibility.PUBLIC)) {
+                return;
+            }
         }
         throw accessDenied();
     }

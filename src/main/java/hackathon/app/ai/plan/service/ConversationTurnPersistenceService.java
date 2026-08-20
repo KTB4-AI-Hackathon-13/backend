@@ -3,6 +3,7 @@ package hackathon.app.ai.plan.service;
 import hackathon.app.ai.plan.dto.PlanTurnResponse;
 import hackathon.app.conversation.ConversationService;
 import hackathon.app.conversation.dto.request.MessageRequest;
+import hackathon.app.image.service.ImageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +15,7 @@ import tools.jackson.databind.ObjectMapper;
 public class ConversationTurnPersistenceService {
     private final ConversationService conversationService;
     private final ConfirmedPlanPersistenceService planPersistenceService;
+    private final ImageService imageService;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -28,7 +30,8 @@ public class ConversationTurnPersistenceService {
         if (!result.confirmed()) {
             return null;
         }
+        Long imageId = imageService.getRandomImageIdByCategoryName(result.category());
         return planPersistenceService.save(
-                userId, conversationId, request.goal_summary(), result.category(), result.plan());
+                userId, conversationId, request.goal_summary(), result.category(), result.plan(), imageId);
     }
 }
