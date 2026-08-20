@@ -4,11 +4,15 @@ import hackathon.app.common.error.ApiException;
 import hackathon.app.common.error.ErrorCode;
 import hackathon.app.domain.puzzle.dto.PuzzleDetailResponse;
 import hackathon.app.domain.puzzle.dto.PuzzleSummaryResponse;
+import hackathon.app.domain.puzzle.dto.GalleryPuzzleDetailResponse;
+import hackathon.app.domain.puzzle.dto.GalleryPuzzleResponse;
 import hackathon.app.domain.puzzle.entity.Puzzle;
 import hackathon.app.domain.puzzle.entity.PuzzlePiece;
 import hackathon.app.domain.puzzle.entity.PuzzleStatus;
+import hackathon.app.domain.puzzle.entity.PuzzleVisibility;
 import hackathon.app.domain.puzzle.repository.PuzzlePieceRepository;
 import hackathon.app.domain.puzzle.repository.PuzzleRepository;
+import hackathon.app.domain.puzzle.repository.PuzzleLikeRepository;
 import hackathon.app.domain.puzzle.repository.PuzzleSpecs;
 import hackathon.app.domain.scheduleitem.entity.ScheduleItem;
 import hackathon.app.domain.scheduleitem.entity.ScheduleItemStatus;
@@ -18,6 +22,10 @@ import hackathon.app.global.common.CursorCodec;
 import hackathon.app.global.common.CursorPage;
 import java.util.List;
 import java.util.Map;
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +34,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import hackathon.app.user.domain.User;
+import hackathon.app.user.infrastructure.JpaUserRepository;
+import hackathon.app.preference.infrastructure.JpaUserPreferenceRepository;
 
 /** 7. 퍼즐 API (MVP) — 내 퍼즐 목록·상세, 사용자 공개 퍼즐 */
 @Service
@@ -39,6 +50,10 @@ public class PuzzleService {
     private final PuzzleRepository puzzleRepository;
     private final PuzzlePieceRepository puzzlePieceRepository;
     private final ScheduleItemRepository scheduleItemRepository;
+    private final PuzzleLikeRepository puzzleLikeRepository;
+    private final JpaUserRepository userRepository;
+    private final JpaUserPreferenceRepository preferenceRepository;
+    private final Clock clock;
 
     /** GET /puzzles/mine */
     public CursorPage<PuzzleSummaryResponse> getMyPuzzles(Long userId, PuzzleStatus status,
@@ -49,26 +64,30 @@ public class PuzzleService {
                 PuzzleSpecs.idLessThan(CursorCodec.decode(cursor))), size);
     }
 
-    /**
-     * GET /users/{userId}/public-puzzles — 완성(COMPLETED) 퍼즐만.
-     * 기존 API 경로는 유지하지만 공개/비공개 값은 조회 조건으로 사용하지 않는다.
-     */
-    public CursorPage<PuzzleSummaryResponse> getPublicPuzzles(Long ownerUserId, Integer size, String cursor) {
+    /** GET /users/{userId}/public-puzzles — 공개·완성 퍼즐만. */
+    public CursorPage<PuzzleSummaryResponse> getPublicPuzzles(Long ownerUserId, String sort,
+                                                              Integer size, String cursor) {
+        // 사용자 프로필은 명세상 카드 목록만 제공하며 상세 이동 권한을 부여하지 않는다.
         return findPuzzles(Specification.allOf(
                 PuzzleSpecs.ownedBy(ownerUserId),
                 PuzzleSpecs.hasStatus(PuzzleStatus.COMPLETED),
+                PuzzleSpecs.isPublic(),
                 PuzzleSpecs.idLessThan(CursorCodec.decode(cursor))), size);
+    }
+
+    public CursorPage<PuzzleSummaryResponse> getPublicPuzzles(Long ownerUserId, Integer size, String cursor) {
+        return getPublicPuzzles(ownerUserId, "LATEST", size, cursor);
     }
 
     /**
      * GET /puzzles/{puzzleId} — 퍼즐 정보 + 조각별 획득 상태.
-     * 본인 퍼즐이면 항상 조회 가능. 타인 퍼즐은 완성된 것만 조회할 수 있다.
+     * 내 퍼즐 상세 API는 소유자 전용이다. 공개 작품 상세는 /gallery/puzzles/{id}를 사용한다.
      */
     public PuzzleDetailResponse getPuzzle(Long viewerUserId, Long puzzleId) {
         Puzzle puzzle = puzzleRepository.findById(puzzleId)
                 .orElseThrow(() -> new ApiException(ErrorCode.PUZZLE_NOT_FOUND));
-        if (!puzzle.isOwnedBy(viewerUserId) && !puzzle.isCompleted()) {
-            throw new ApiException(ErrorCode.PUZZLE_NOT_PUBLIC);
+        if (!puzzle.isOwnedBy(viewerUserId)) {
+            throw new ApiException(ErrorCode.FORBIDDEN);
         }
 
         List<ScheduleItem> items = scheduleItemRepository
@@ -79,6 +98,80 @@ public class PuzzleService {
         List<PuzzlePiece> pieces = puzzlePieceRepository.findByPuzzleIdOrderByPositionAsc(puzzle.getId());
 
         return PuzzleDetailResponse.of(puzzle, items, pieces);
+    }
+
+    @Transactional
+    public PuzzleSummaryResponse changeVisibility(Long userId, Long puzzleId, PuzzleVisibility visibility) {
+        Puzzle puzzle = ownedPuzzle(userId, puzzleId);
+        if (visibility == PuzzleVisibility.PUBLIC && !puzzle.isCompleted()) {
+            throw new ApiException(ErrorCode.PUZZLE_NOT_COMPLETED);
+        }
+        puzzle.changeVisibility(visibility);
+        long total = countTotalPieces(List.of(puzzle)).getOrDefault(puzzle.getScheduleId(), 0L);
+        long earned = countEarnedPieces(List.of(puzzle)).getOrDefault(puzzle.getId(), 0L);
+        return PuzzleSummaryResponse.of(puzzle, total, earned);
+    }
+
+    public CursorPage<GalleryPuzzleResponse> getGallery(Long viewerUserId, String sort,
+                                                        Integer size, String cursor) {
+        int pageSize = normalizeSize(size);
+        List<Puzzle> publicPuzzles = new ArrayList<>(puzzleRepository.findAll(Specification.allOf(
+                PuzzleSpecs.hasStatus(PuzzleStatus.COMPLETED), PuzzleSpecs.isPublic())));
+        Map<Long, Long> likeCounts = countLikes(publicPuzzles);
+        Comparator<Puzzle> order = "POPULAR".equalsIgnoreCase(sort)
+                ? Comparator.<Puzzle>comparingLong(p -> likeCounts.getOrDefault(p.getId(), 0L)).reversed()
+                        .thenComparing(Puzzle::getId, Comparator.reverseOrder())
+                : Comparator.comparing(Puzzle::getCompletedAt,
+                                Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(Puzzle::getId, Comparator.reverseOrder());
+        publicPuzzles.sort(order);
+        Long cursorId = CursorCodec.decode(cursor);
+        int start = indexAfter(publicPuzzles, cursorId);
+        int end = Math.min(start + pageSize, publicPuzzles.size());
+        List<Puzzle> page = publicPuzzles.subList(start, end);
+        Map<Long, User> users = userRepository.findAllById(page.stream().map(Puzzle::getUserId).distinct().toList())
+                .stream().collect(Collectors.toMap(User::getId, Function.identity()));
+        List<GalleryPuzzleResponse> items = page.stream().map(puzzle -> GalleryPuzzleResponse.of(
+                puzzle, publicNickname(users.get(puzzle.getUserId())),
+                likeCounts.getOrDefault(puzzle.getId(), 0L),
+                viewerUserId != null && puzzleLikeRepository
+                        .existsByIdPuzzleIdAndIdUserId(puzzle.getId(), viewerUserId))).toList();
+        boolean hasNext = end < publicPuzzles.size();
+        String nextCursor = page.isEmpty() ? null : CursorCodec.encode(page.getLast().getId());
+        return CursorPage.of(items, nextCursor, hasNext);
+    }
+
+    public GalleryPuzzleDetailResponse getGalleryPuzzle(Long viewerUserId, Long puzzleId) {
+        Puzzle puzzle = publicCompletedPuzzle(puzzleId);
+        User author = userRepository.findById(puzzle.getUserId())
+                .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
+        List<ScheduleItem> items = scheduleItemRepository
+                .findBySchedule_IdOrderByScheduledDateAscPositionAscPriorityAscIdAsc(puzzle.getScheduleId()).stream()
+                .filter(ScheduleItem::countsAsPuzzlePiece).toList();
+        PuzzleDetailResponse detail = PuzzleDetailResponse.of(puzzle, items,
+                puzzlePieceRepository.findByPuzzleIdOrderByPositionAsc(puzzleId));
+        return new GalleryPuzzleDetailResponse(detail, author.getId(), publicNickname(author),
+                puzzleLikeRepository.countByIdPuzzleId(puzzleId),
+                viewerUserId != null && puzzleLikeRepository.existsByIdPuzzleIdAndIdUserId(puzzleId, viewerUserId));
+    }
+
+    @Transactional
+    public GalleryPuzzleResponse like(Long userId, Long puzzleId) {
+        Puzzle puzzle = publicCompletedPuzzle(puzzleId);
+        if (!puzzleLikeRepository.existsByIdPuzzleIdAndIdUserId(puzzleId, userId)) {
+            puzzleLikeRepository.save(hackathon.app.domain.puzzle.entity.PuzzleLike.create(
+                    puzzleId, userId, LocalDateTime.now(clock)));
+        }
+        User author = userRepository.findById(puzzle.getUserId())
+                .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
+        return GalleryPuzzleResponse.of(puzzle, publicNickname(author),
+                puzzleLikeRepository.countByIdPuzzleId(puzzleId), true);
+    }
+
+    @Transactional
+    public void unlike(Long userId, Long puzzleId) {
+        publicCompletedPuzzle(puzzleId);
+        puzzleLikeRepository.deleteByIdPuzzleIdAndIdUserId(puzzleId, userId);
     }
 
     // ===== 내부 헬퍼 =====
@@ -103,6 +196,45 @@ public class PuzzleService {
 
         String nextCursor = puzzles.isEmpty() ? null : CursorCodec.encode(puzzles.getLast().getId());
         return CursorPage.of(items, nextCursor, hasNext);
+    }
+
+    private Puzzle ownedPuzzle(Long userId, Long puzzleId) {
+        Puzzle puzzle = puzzleRepository.findById(puzzleId)
+                .orElseThrow(() -> new ApiException(ErrorCode.PUZZLE_NOT_FOUND));
+        if (!puzzle.isOwnedBy(userId)) throw new ApiException(ErrorCode.FORBIDDEN);
+        return puzzle;
+    }
+
+    private Puzzle publicCompletedPuzzle(Long puzzleId) {
+        Puzzle puzzle = puzzleRepository.findById(puzzleId)
+                .orElseThrow(() -> new ApiException(ErrorCode.PUZZLE_NOT_FOUND));
+        if (!puzzle.isCompleted() || puzzle.getVisibility() != PuzzleVisibility.PUBLIC) {
+            throw new ApiException(ErrorCode.PUZZLE_NOT_PUBLIC);
+        }
+        return puzzle;
+    }
+
+    private Map<Long, Long> countLikes(List<Puzzle> puzzles) {
+        if (puzzles.isEmpty()) return Map.of();
+        return puzzleLikeRepository.countByPuzzleIds(puzzles.stream().map(Puzzle::getId).toList()).stream()
+                .collect(Collectors.toMap(PuzzleLikeRepository.LikeCountProjection::getPuzzleId,
+                        PuzzleLikeRepository.LikeCountProjection::getLikeCount));
+    }
+
+    private int indexAfter(List<Puzzle> puzzles, Long cursorId) {
+        if (cursorId == null) return 0;
+        for (int i = 0; i < puzzles.size(); i++) {
+            if (puzzles.get(i).getId().equals(cursorId)) return i + 1;
+        }
+        throw new ApiException(ErrorCode.INVALID_CURSOR);
+    }
+
+    private String publicNickname(User user) {
+        if (user == null) return "알 수 없음";
+        return preferenceRepository.findById(user.getId())
+                .filter(hackathon.app.preference.domain.UserPreference::isGalleryNicknameVisible)
+                .map(ignored -> user.getNickname())
+                .orElse("익명");
     }
 
     /** 퍼즐별 획득 조각 수 */
