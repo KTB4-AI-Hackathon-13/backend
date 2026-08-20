@@ -7,7 +7,6 @@ import hackathon.app.domain.puzzle.dto.PuzzleSummaryResponse;
 import hackathon.app.domain.puzzle.entity.Puzzle;
 import hackathon.app.domain.puzzle.entity.PuzzlePiece;
 import hackathon.app.domain.puzzle.entity.PuzzleStatus;
-import hackathon.app.domain.puzzle.entity.PuzzleVisibility;
 import hackathon.app.domain.puzzle.repository.PuzzlePieceRepository;
 import hackathon.app.domain.puzzle.repository.PuzzleRepository;
 import hackathon.app.domain.puzzle.repository.PuzzleSpecs;
@@ -51,25 +50,24 @@ public class PuzzleService {
     }
 
     /**
-     * GET /users/{userId}/public-puzzles — 공개(PUBLIC) + 완성(COMPLETED) 퍼즐만.
-     * 본인이 조회해도 동일하게 공개 퍼즐만 보인다 (내 것 전체는 /puzzles/mine).
+     * GET /users/{userId}/public-puzzles — 완성(COMPLETED) 퍼즐만.
+     * 기존 API 경로는 유지하지만 공개/비공개 값은 조회 조건으로 사용하지 않는다.
      */
     public CursorPage<PuzzleSummaryResponse> getPublicPuzzles(Long ownerUserId, Integer size, String cursor) {
         return findPuzzles(Specification.allOf(
                 PuzzleSpecs.ownedBy(ownerUserId),
-                PuzzleSpecs.hasVisibility(PuzzleVisibility.PUBLIC),
                 PuzzleSpecs.hasStatus(PuzzleStatus.COMPLETED),
                 PuzzleSpecs.idLessThan(CursorCodec.decode(cursor))), size);
     }
 
     /**
      * GET /puzzles/{puzzleId} — 퍼즐 정보 + 조각별 획득 상태.
-     * 본인 퍼즐이면 항상 조회 가능. 타인 퍼즐은 공개·완성된 것만 (아니면 403 PUZZLE_NOT_PUBLIC).
+     * 본인 퍼즐이면 항상 조회 가능. 타인 퍼즐은 완성된 것만 조회할 수 있다.
      */
     public PuzzleDetailResponse getPuzzle(Long viewerUserId, Long puzzleId) {
         Puzzle puzzle = puzzleRepository.findById(puzzleId)
                 .orElseThrow(() -> new ApiException(ErrorCode.PUZZLE_NOT_FOUND));
-        if (!puzzle.isOwnedBy(viewerUserId) && !(puzzle.isPublic() && puzzle.isCompleted())) {
+        if (!puzzle.isOwnedBy(viewerUserId) && !puzzle.isCompleted()) {
             throw new ApiException(ErrorCode.PUZZLE_NOT_PUBLIC);
         }
 

@@ -31,11 +31,13 @@ public class ImageService {
     private final StoredImageRepository images;
     private final ObjectStorage storage;
     private final ImageOwnerValidator ownerValidator;
+    private final ImageReadAccessPolicy readAccessPolicy;
     private final AuthService auth;
 
     public ImageService(StoredImageRepository images, ObjectStorage storage,
-            ImageOwnerValidator ownerValidator, AuthService auth) {
-        this.images = images; this.storage = storage; this.ownerValidator = ownerValidator; this.auth = auth;
+            ImageOwnerValidator ownerValidator, ImageReadAccessPolicy readAccessPolicy, AuthService auth) {
+        this.images = images; this.storage = storage; this.ownerValidator = ownerValidator;
+        this.readAccessPolicy = readAccessPolicy; this.auth = auth;
     }
 
     public ImageResult upload(String sessionId, MultipartFile file, ImageOwnerType ownerType, String ownerId) {
@@ -58,9 +60,9 @@ public class ImageService {
 
     @Transactional(readOnly = true)
     public ImageResult get(String sessionId, Long imageId) {
-        User user = auth.requireUser(sessionId);
         StoredImage image = active(imageId);
-        if (!image.getUploaderUserId().equals(user.getId())) throw new ApiException(ErrorCode.IMAGE_ACCESS_DENIED);
+        Long viewerUserId = auth.findUser(sessionId).map(User::getId).orElse(null);
+        readAccessPolicy.check(image, viewerUserId);
         ObjectStorage.SignedUrl signed = storage.signedGetUrl(image.getStorageKey());
         return new ImageResult(image, signed.url(), signed.expiresAt());
     }
