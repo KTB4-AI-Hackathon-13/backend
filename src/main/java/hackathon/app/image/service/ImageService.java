@@ -19,6 +19,7 @@ import hackathon.app.image.entity.ImageOwnerType;
 import hackathon.app.image.entity.StoredImage;
 import hackathon.app.image.repository.StoredImageRepository;
 import hackathon.app.user.domain.User;
+import hackathon.app.domain.scheduleitem.policy.CategoryChecker;
 
 @Service
 @Transactional
@@ -33,21 +34,25 @@ public class ImageService {
     private final ImageOwnerValidator ownerValidator;
     private final ImageReadAccessPolicy readAccessPolicy;
     private final AuthService auth;
+    private final CategoryChecker categoryChecker;
 
     public ImageService(StoredImageRepository images, ObjectStorage storage,
-            ImageOwnerValidator ownerValidator, ImageReadAccessPolicy readAccessPolicy, AuthService auth) {
+            ImageOwnerValidator ownerValidator, ImageReadAccessPolicy readAccessPolicy, AuthService auth,
+            CategoryChecker categoryChecker) {
         this.images = images; this.storage = storage; this.ownerValidator = ownerValidator;
-        this.readAccessPolicy = readAccessPolicy; this.auth = auth;
+        this.readAccessPolicy = readAccessPolicy; this.auth = auth; this.categoryChecker = categoryChecker;
     }
 
-    public ImageResult upload(String sessionId, MultipartFile file, ImageOwnerType ownerType, String ownerId) {
+    public ImageResult upload(String sessionId, MultipartFile file, ImageOwnerType ownerType,
+                              String ownerId, Long categoryId) {
         User user = auth.requireUser(sessionId);
         ownerValidator.validate(ownerType, ownerId, user.getId());
+        validateCategory(categoryId);
         ValidatedFile valid = validate(file);
         String key = "images/" + user.getId() + "/" + UUID.randomUUID() + "." + valid.extension();
         storage.upload(key, valid.bytes(), valid.contentType());
         try {
-            StoredImage saved = images.save(StoredImage.create(user.getId(), ownerType, ownerId, key,
+            StoredImage saved = images.save(StoredImage.create(user.getId(), categoryId, ownerType, ownerId, key,
                 safeFilename(file.getOriginalFilename()), valid.contentType(), valid.bytes().length,
                 valid.width(), valid.height(), sha256(valid.bytes())));
             ObjectStorage.SignedUrl signed = storage.signedGetUrl(key);
@@ -78,6 +83,13 @@ public class ImageService {
 
     private StoredImage active(Long id) {
         return images.findByIdAndDeletedAtIsNull(id).orElseThrow(() -> new ApiException(ErrorCode.IMAGE_NOT_FOUND));
+    }
+
+    private void validateCategory(Long categoryId) {
+        if (categoryId != null && !categoryChecker.existsActive(categoryId)) {
+            throw new ApiException(ErrorCode.INVALID_REQUEST,
+                    "존재하지 않거나 사용 중지된 카테고리입니다: " + categoryId);
+        }
     }
 
     private ValidatedFile validate(MultipartFile file) {

@@ -21,7 +21,7 @@ public class ImageController {
             @Valid @ModelAttribute ImageUploadRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
             .body(ApiResponse.of(ImageResponse.from(service.upload(sessionId, request.file(),
-                request.ownerType(), request.ownerId()))));
+                request.ownerType(), request.ownerId(), request.categoryId()))));
     }
 
     @GetMapping("/{imageId}")
