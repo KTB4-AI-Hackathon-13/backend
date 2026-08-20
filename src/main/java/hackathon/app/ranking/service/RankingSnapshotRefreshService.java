@@ -68,7 +68,7 @@ public class RankingSnapshotRefreshService {
                         .existsByRankingDateAndRankingTypeAndPeriodTypeAndScopeAndCategoryIdIsNull(
                                 today,
                                 RankingType.PUZZLE_PIECES,
-                                PeriodType.YEARLY,
+                                PeriodType.ALL,
                                 RankingScope.OVERALL)) {
             lastRefreshDate.set(today);
             return;

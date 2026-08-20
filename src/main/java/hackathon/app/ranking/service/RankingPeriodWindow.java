@@ -13,7 +13,6 @@ public record RankingPeriodWindow(LocalDate from, LocalDate to) {
             case DAILY -> rankingDate;
             case WEEKLY -> rankingDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
             case MONTHLY -> rankingDate.withDayOfMonth(1);
-            case YEARLY -> rankingDate.withDayOfYear(1);
             case ALL -> null;
         };
         return new RankingPeriodWindow(from, rankingDate);

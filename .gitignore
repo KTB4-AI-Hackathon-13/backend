@@ -53,3 +53,4 @@ CLAUDE.md
 !/docs/migration/
 /docs/migration/*
 !/docs/migration/2026-08-20_ranking_full_contract.sql
+!/docs/migration/2026-08-21_ranking_period_align_with_production.sql
