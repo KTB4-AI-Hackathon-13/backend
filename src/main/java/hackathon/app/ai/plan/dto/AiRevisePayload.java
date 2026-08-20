@@ -5,11 +5,12 @@ import java.util.Map;
 
 public record AiRevisePayload(
         String conversation_id,
+        String schedule_id,
         String goal_summary,
         String category,
         Map<String, Object> template_answers,
         SchedulePlan current_plan,
         String user_message,
         List<String> feedback_history,
-        Object[] busy_dates
+        List<BusyDatePayload> busy_dates
 ) {}

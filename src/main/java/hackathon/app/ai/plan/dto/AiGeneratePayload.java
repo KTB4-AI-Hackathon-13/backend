@@ -10,6 +10,6 @@ public record AiGeneratePayload(
         String goal_summary,
         String category,
         Map<String, Object> template_answers,
-        List<JsonNode> busy_dates,
+        List<BusyDatePayload> busy_dates,
         JsonNode long_term_context
 ) {}

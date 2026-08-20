@@ -54,11 +54,12 @@ public class ConversationService {
     }
 
     /** 외부 AI를 호출하기 전에 대화 소유권과 활성 상태만 확인한다. 메시지는 아직 저장하지 않는다. */
-    public void requireActive(Long userId, String conversationId) {
+    public Conversation requireActive(Long userId, String conversationId) {
         Conversation conversation = owned(userId, conversationId);
         if (conversation.getStatus() == ConversationStatus.ARCHIVED) {
             throw ConversationException.archived();
         }
+        return conversation;
     }
 
     @Transactional
