@@ -11,7 +11,7 @@ public record ReviseScheduleRequest(
         @NotBlank @Size(max = 1000) String goalSummary,
         @NotBlank String category,
         Map<String, Object> templateAnswers,
-        JsonNode currentPlan,
+        SchedulePlan currentPlan,
         @NotBlank @Size(max = 5000) String userMessage,
         List<String> feedbackHistory,
         List<JsonNode> busyDates

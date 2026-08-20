@@ -10,7 +10,7 @@ public record AiRevisePayload(
         String goal_summary,
         String category,
         Map<String, Object> template_answers,
-        JsonNode current_plan,
+        SchedulePlan current_plan,
         String user_message,
         List<String> feedback_history,
         List<JsonNode> busy_dates
