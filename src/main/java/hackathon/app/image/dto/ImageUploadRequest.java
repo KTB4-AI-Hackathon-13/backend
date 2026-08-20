@@ -8,5 +8,6 @@ import jakarta.validation.constraints.NotNull;
 public record ImageUploadRequest(
         @NotNull MultipartFile file,
         @NotNull ImageOwnerType ownerType,
-        @NotBlank String ownerId) {
+        @NotBlank String ownerId,
+        Long categoryId) {
 }

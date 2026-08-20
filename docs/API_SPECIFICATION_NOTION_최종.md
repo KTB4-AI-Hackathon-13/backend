@@ -267,8 +267,8 @@ WHERE schedule_id = :schedule_id
 
 | 기능 | Method | URL | 인증 | Content-Type | 주요 요청값 | 주요 응답값 | 연결 테이블 |
 |---|---|---|---:|---|---|---|---|
-| 이미지 업로드 | POST | `/images` | O | `multipart/form-data` | `file`, `ownerType`, `ownerId` | 이미지 ID·URL·크기 | `images` |
-| 이미지 조회 | GET | `/images/{imageId}` | 권한별 | JSON | 없음 | 메타데이터, 서명 URL | `images` |
+| 이미지 업로드 | POST | `/images` | O | `multipart/form-data` | `file`, `ownerType`, `ownerId`, `categoryId?` | 이미지 ID·URL·크기·카테고리 | `images`, `categories` |
+| 이미지 조회 | GET | `/images/{imageId}` | 권한별 | JSON | 없음 | 메타데이터, categoryId, 서명 URL | `images`, `categories` |
 | 이미지 삭제 | DELETE | `/images/{imageId}` | O | JSON | 없음 | 204 | `images` |
 
 ### 이미지 업로드 제한

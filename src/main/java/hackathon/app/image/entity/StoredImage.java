@@ -10,6 +10,8 @@ public class StoredImage {
     private Long id;
     @Column(name = "uploader_user_id", nullable = false)
     private Long uploaderUserId;
+    @Column(name = "category_id")
+    private Long categoryId;
     @Enumerated(EnumType.STRING)
     @Column(name = "owner_type", nullable = false)
     private ImageOwnerType ownerType;
@@ -34,11 +36,12 @@ public class StoredImage {
 
     protected StoredImage() {}
 
-    public static StoredImage create(Long uploaderUserId, ImageOwnerType ownerType, String ownerId,
+    public static StoredImage create(Long uploaderUserId, Long categoryId, ImageOwnerType ownerType, String ownerId,
             String storageKey, String originalFilename, String contentType, long byteSize,
             int width, int height, String checksum) {
         StoredImage image = new StoredImage();
         image.uploaderUserId = uploaderUserId;
+        image.categoryId = categoryId;
         image.ownerType = ownerType;
         image.ownerId = ownerId;
         image.storageKey = storageKey;
@@ -56,6 +59,7 @@ public class StoredImage {
     public boolean isDeleted() { return deletedAt != null; }
     public Long getId() { return id; }
     public Long getUploaderUserId() { return uploaderUserId; }
+    public Long getCategoryId() { return categoryId; }
     public ImageOwnerType getOwnerType() { return ownerType; }
     public String getOwnerId() { return ownerId; }
     public String getStorageKey() { return storageKey; }
