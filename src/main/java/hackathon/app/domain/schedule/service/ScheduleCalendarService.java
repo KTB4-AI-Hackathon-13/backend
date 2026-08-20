@@ -48,7 +48,8 @@ public class ScheduleCalendarService {
     /** GET /schedule-items/today — 기준 시간대: Asia/Seoul (회원 timezone 도입 시 교체) */
     public TodayItemsResponse getToday(Long userId) {
         LocalDate today = LocalDate.now(clock);
-        List<ScheduleItem> items = scheduleItemRepository.findByUserIdAndDateBetween(userId, today, today);
+        List<ScheduleItem> items = scheduleItemRepository
+                .findByUserIdAndDateBetween(userId, today, today);
         return new TodayItemsResponse(today, countValid(items), countCompleted(items),
                 items.stream().map(DailyItemResponse::from).toList());
     }
