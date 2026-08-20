@@ -66,7 +66,7 @@ public class ScheduleItemService {
                 .scheduledDate(request.scheduledDate())
                 .estimatedMinutes(request.estimatedMinutes())
                 .itemType(itemType)
-                .priority(3)
+                .priority(request.priority())
                 .position(position)
                 .source(ChangeSource.USER)
                 .build());
@@ -97,7 +97,7 @@ public class ScheduleItemService {
                 .scheduledDate(request.scheduledDate())
                 .estimatedMinutes(request.estimatedMinutes())
                 .itemType(itemType)
-                .priority(3)
+                .priority(request.priority())
                 .position(position)
                 .source(ChangeSource.USER)
                 .build());
@@ -128,7 +128,7 @@ public class ScheduleItemService {
 
         Map<String, Object> before = snapshot(item);
         item.update(request.title(), request.description(), request.scheduledDate(),
-                request.estimatedMinutes(), itemType, null, request.position());
+                request.estimatedMinutes(), itemType, request.priority(), request.position());
         Map<String, Object> after = snapshot(item);
 
         if (schedule != null) schedule.increaseVersion();
