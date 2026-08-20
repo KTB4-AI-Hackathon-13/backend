@@ -51,7 +51,7 @@ public class AiPlanService {
         validateConversation(userId, request.conversationId());
         validateTemplateAnswers(request.templateAnswers());
         PlanTurnResponse response = validatePlanTurn(aiPlanClient.generate(new AiGeneratePayload(
-                request.conversationId(), request.scheduleId(), request.goalSummary(), request.category(),
+                request.conversationId(), request.goalSummary(), request.category(),
                 request.templateAnswers(), emptyIfNull(request.busyDates()), request.longTermContext())));
         conversationRecorder.append(userId, request.conversationId(), request, response,
                 AiPlanConversationRecorder.PLAN_TURN);

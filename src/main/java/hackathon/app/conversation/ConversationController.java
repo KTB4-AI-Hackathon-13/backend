@@ -36,6 +36,12 @@ public class ConversationController {
         return ApiResponse.of(service.list(loginUser.userId(), safeSize, cursor));
     }
 
+    @GetMapping("/{conversationId}")
+    ApiResponse<ConversationResponse> find(@LoginUser LoginUserInfo loginUser,
+            @PathVariable String conversationId) {
+        return ApiResponse.of(service.find(loginUser.userId(), conversationId));
+    }
+
     @GetMapping("/{conversationId}/messages")
     ApiResponse<MessageScrollResponse> messages(@LoginUser LoginUserInfo loginUser, @PathVariable String conversationId,
             @RequestParam(defaultValue = "50") int size, @RequestParam(required = false) Integer before) {

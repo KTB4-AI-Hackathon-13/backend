@@ -2,11 +2,15 @@ package hackathon.app.ai.plan.service;
 
 import hackathon.app.ai.plan.client.AiPlanClient;
 import hackathon.app.ai.plan.dto.AiRevisePayload;
+import hackathon.app.ai.plan.dto.DailyTask;
 import hackathon.app.ai.plan.dto.PlanTurnResponse;
+import hackathon.app.ai.plan.dto.SchedulePlan;
 import hackathon.app.conversation.ConversationService;
 import hackathon.app.conversation.domain.Conversation;
 import hackathon.app.conversation.dto.request.MessageRequest;
 import hackathon.app.conversation.dto.response.ConversationTurnResponse;
+import hackathon.app.domain.scheduleitem.entity.ScheduleItemStatus;
+import hackathon.app.domain.scheduleitem.repository.ScheduleItemRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,6 +21,7 @@ public class ConversationPlanService {
     private final ConversationService conversationService;
     private final AiPlanClient aiPlanClient;
     private final ConversationTurnPersistenceService turnPersistenceService;
+    private final ScheduleItemRepository scheduleItems;
 
     public ConversationTurnResponse turn(Long userId, String conversationId, MessageRequest request) {
         // 권한/상태는 먼저 확인하되, AI 호출이 성공하기 전에는 메시지를 DB에 남기지 않는다.
@@ -24,6 +29,7 @@ public class ConversationPlanService {
         String requestedScheduleId = conversation.getScheduleId() == null
                 ? null
                 : conversation.getScheduleId().toString();
+        SchedulePlan currentPlan = remainingPlan(conversation, request.current_plan());
 
         PlanTurnResponse result = aiPlanClient.revise(new AiRevisePayload(
                 conversationId,
@@ -31,7 +37,7 @@ public class ConversationPlanService {
                 request.goal_summary(),
                 request.category(),
                 request.template_answers(),
-                request.current_plan(),
+                currentPlan,
                 request.message(),
                 request.feedback_history() == null ? List.of() : request.feedback_history(),
                 request.busy_dates() == null ? List.of() : request.busy_dates()));
@@ -43,5 +49,18 @@ public class ConversationPlanService {
         return new ConversationTurnResponse(
                 result.assistant_message(), result.plan(), result.ready_to_confirm(), result.confirmed(),
                 submitted, result.feedback_history(), savedScheduleId);
+    }
+
+    private SchedulePlan remainingPlan(Conversation conversation, SchedulePlan fallback) {
+        if (conversation.getScheduleId() == null) return fallback;
+        List<DailyTask> tasks = scheduleItems
+                .findBySchedule_IdOrderByScheduledDateAscPositionAscPriorityAscIdAsc(
+                        conversation.getScheduleId())
+                .stream()
+                .filter(item -> item.getStatus() != ScheduleItemStatus.COMPLETED)
+                .map(item -> new DailyTask(String.valueOf(item.getId()), item.getScheduledDate(),
+                        item.getTitle(), item.getDescription(), item.getEstimatedMinutes()))
+                .toList();
+        return new SchedulePlan(fallback.summary(), tasks);
     }
 }

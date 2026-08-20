@@ -8,7 +8,6 @@ import tools.jackson.databind.JsonNode;
 
 public record GenerateScheduleRequest(
         @NotBlank String conversationId,
-        @NotBlank String scheduleId,
         @NotBlank String goalSummary,
         @NotBlank String category,
         @NotEmpty Map<String, Object> templateAnswers,
