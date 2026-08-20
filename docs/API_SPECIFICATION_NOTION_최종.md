@@ -288,6 +288,44 @@ WHERE schedule_id = :schedule_id
 | 파일 저장 | 오브젝트 스토리지 |
 | DB 저장 | 경로와 메타데이터만 저장 |
 
+### 서명 URL(만료) 🆕
+
+업로드·조회 응답의 `url`은 영구 링크가 아니라 매 요청마다 새로 발급하는 S3 서명(presigned) URL이다.
+`urlExpiresAt`(기본 발급 후 10분) 이후에는 이 URL로 접근할 수 없다.
+
+| 항목 | 내용 |
+|---|---|
+| 만료 시간 | 기본 10분 (서버 설정값, 응답의 `urlExpiresAt`로 매번 확인) |
+| 캐싱 여부 | 프론트에서 `url`을 저장해두고 재사용하지 말 것 |
+| 갱신 방법 | 화면에 다시 표시할 때마다 `GET /images/{imageId}`를 호출해 새 서명 URL을 받는다 |
+
+### 소유권 규칙 🆕
+
+업로드·조회·삭제 모두 `ownerType` + `ownerId`가 **로그인한 사용자 소유의 실제 리소스**를 가리켜야 한다.
+즉 부모 리소스(스케줄·작업·퍼즐 등)를 먼저 만들어 id를 받은 뒤, 그 id로 이미지를 업로드하는 순서여야 한다.
+
+| `ownerType` | `ownerId`가 가리키는 것 | 검증 기준 |
+|---|---|---|
+| `USER` | 자기 자신의 회원 id | `ownerId == 내 userId` |
+| `SCHEDULE` | 내 스케줄 id | `schedules.user_id == 내 userId` |
+| `SCHEDULE_ITEM` | 내 스케줄에 속한 작업 id | 상위 `schedules.user_id == 내 userId` |
+| `MESSAGE` | 내 대화에 속한 메시지 id | 상위 `conversations.user_id == 내 userId` |
+| `PUZZLE` | 내 퍼즐 id | `puzzles.user_id == 내 userId` |
+
+기준을 만족하지 않으면 업로드 시점에 `IMAGE_ACCESS_DENIED`(403)로 거부된다.
+
+### 이미지 오류 🆕
+
+| 오류 코드 | HTTP | 조건 |
+|---|---:|---|
+| `IMAGE_NOT_FOUND` | 404 | 이미지 없음(또는 이미 삭제됨) |
+| `IMAGE_ACCESS_DENIED` | 403 | 본인 소유가 아니거나 `ownerId`가 내 리소스가 아님 |
+| `IMAGE_FILE_REQUIRED` | 400 | `file` 파트가 없거나 빈 파일 |
+| `IMAGE_TOO_LARGE` | 413 | 10MB 초과 |
+| `UNSUPPORTED_IMAGE_TYPE` | 415 | PNG, JPEG, WebP 이외 형식 |
+| `INVALID_IMAGE_FILE` | 422 | 확장자·MIME은 맞지만 이미지 디코딩 실패(손상 파일) |
+| `IMAGE_STORAGE_FAILED` | 500 | 오브젝트 스토리지 업로드·삭제·서명 URL 발급 실패 |
+
 # 9. 랭킹 API
 
 | 기능 | Method | URL | 인증 | 주요 요청값 | 주요 응답값 | 연결 테이블 |
