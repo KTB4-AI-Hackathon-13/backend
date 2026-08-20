@@ -1,6 +1,7 @@
 package hackathon.app.ai.plan.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import java.util.Map;
 
 import jakarta.validation.constraints.Size;
