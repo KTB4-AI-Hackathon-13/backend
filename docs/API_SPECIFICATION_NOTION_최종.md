@@ -136,9 +136,12 @@ BE가 외부 AI 서버에 요청하고 응답을 기다린 뒤, 검증과 저장
 | 기능 | Method | URL | 인증 | 주요 요청값 | 주요 응답값 | 연결 테이블 |
 |---|---|---|---:|---|---|---|
 | ✅ AI 계획 생성 | POST | `/schedules/ai-generations` | O | `conversationId`, `title`, `categoryId` | 저장 완료된 스케줄 상세(200) | `schedules`, `schedule_items` |
-| ✅ AI 계획 수정 | POST | `/schedules/{scheduleId}/ai-revisions` | O | `instruction`, `conversationId` | 수정 완료된 스케줄 상세(200) | 생성 작업, 변경 이력 |
+| ✅ AI 계획 수정 | POST | `/schedules/{scheduleId}/ai-revisions` | O | `conversationId`, `goalSummary`, `category`, `templateAnswers`, `currentPlan`, `userMessage` | 확정 시 저장된 스케줄 ID, AI `category`, 무작위 이미지 URL | `schedules`, `schedule_items`, `categories`, `images` |
 
 AI 응답의 `estimated_min`은 `schedule_items.estimated_minutes`, `summary`는 `schedules.description`에 저장한다. 외부 AI 설정은 `AI_BASE_URL`, `AI_CONNECT_TIMEOUT_SECONDS`, `AI_READ_TIMEOUT_SECONDS`를 사용한다.
+
+`/ai-revisions`에서 외부 AI 응답이 `confirmed: true`이면 응답 최상위 한글 `category`를 Java `CategoryType`으로 검증하고 영문 코드로 변환한다. 활성 `categories.code`가 같은 삭제되지 않은 이미지 중 하나를 무작위로 선택하고 `image_id`, 새 S3 서명 `image_url`, `image_url_expires_at`을 함께 반환한다. 지원 카테고리는 운동·다이어트·음악·공부·어학·커리어·습관·마인드셋·인간관계·취미이다.
+
 
 ### AI 계획 오류
 

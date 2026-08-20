@@ -65,6 +65,7 @@ CREATE TABLE user_preferences (
 
 CREATE TABLE categories (
   id BIGINT NOT NULL AUTO_INCREMENT,
+  code VARCHAR(30) NOT NULL,
   name VARCHAR(80) NOT NULL,
   description VARCHAR(500) NULL,
   icon_url VARCHAR(1000) NULL,
@@ -73,6 +74,7 @@ CREATE TABLE categories (
   created_at DATETIME NOT NULL,
   updated_at DATETIME NOT NULL,
   PRIMARY KEY (id),
+  UNIQUE KEY uk_categories_code (code),
   UNIQUE KEY uk_categories_name (name)
 );
 

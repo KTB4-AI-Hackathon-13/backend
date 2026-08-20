@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import hackathon.app.image.service.ImageService;
 
 /** 외부 AI 호출은 DB 트랜잭션 밖에서 수행하고, 응답을 받은 뒤 저장 서비스에 위임한다. */
 @Service
@@ -21,6 +22,7 @@ public class AiPlanService {
     private final ConversationRepository conversationRepository;
     private final AiPlanConversationRecorder conversationRecorder;
     private final ConfirmedPlanPersistenceService confirmedPlanPersistenceService;
+    private final ImageService imageService;
 
     public TemplateResponse generateTemplate(Long userId, GenerateTemplateRequest request) {
         validateConversation(userId, request.conversationId());
@@ -68,9 +70,11 @@ public class AiPlanService {
                 request.feedbackHistory() == null ? List.of() : request.feedbackHistory(),
                 emptyIfNull(request.busyDates()))));
         if (response.confirmed()) {
+            ImageService.ImageResult image = imageService.getRandomByCategoryName(response.category());
             Long savedScheduleId = confirmedPlanPersistenceService.save(
                     userId, request.conversationId(), request.goalSummary(), response.plan());
             response = response.withSavedScheduleId(savedScheduleId);
+            response = response.withImage(image.image().getId(), image.url(), image.expiresAt());
         }
         conversationRecorder.append(userId, request.conversationId(), request.userMessage(), response,
                 response.confirmed() ? AiPlanConversationRecorder.PLAN_CONFIRMED

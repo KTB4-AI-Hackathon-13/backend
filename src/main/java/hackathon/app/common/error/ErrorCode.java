@@ -45,6 +45,7 @@ public enum ErrorCode {
 
     // ===== 이미지 API =====
     IMAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "이미지를 찾을 수 없습니다."),
+    IMAGE_NOT_FOUND_IN_CATEGORY(HttpStatus.NOT_FOUND, "AI가 선택한 카테고리에 등록된 이미지가 없습니다."),
     IMAGE_ACCESS_DENIED(HttpStatus.FORBIDDEN, "이미지에 접근할 권한이 없습니다."),
     IMAGE_FILE_REQUIRED(HttpStatus.BAD_REQUEST, "이미지 파일이 필요합니다."),
     IMAGE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "이미지는 10MB 이하여야 합니다."),

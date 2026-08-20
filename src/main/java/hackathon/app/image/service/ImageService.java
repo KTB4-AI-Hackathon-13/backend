@@ -20,6 +20,7 @@ import hackathon.app.image.entity.StoredImage;
 import hackathon.app.image.repository.StoredImageRepository;
 import hackathon.app.user.domain.User;
 import hackathon.app.domain.scheduleitem.policy.CategoryChecker;
+import hackathon.app.category.CategoryType;
 
 @Service
 @Transactional
@@ -68,6 +69,17 @@ public class ImageService {
         StoredImage image = active(imageId);
         Long viewerUserId = auth.findUser(sessionId).map(User::getId).orElse(null);
         readAccessPolicy.check(image, viewerUserId);
+        ObjectStorage.SignedUrl signed = storage.signedGetUrl(image.getStorageKey());
+        return new ImageResult(image, signed.url(), signed.expiresAt());
+    }
+
+    @Transactional(readOnly = true)
+    public ImageResult getRandomByCategoryName(String categoryName) {
+        CategoryType category = CategoryType.fromDisplayName(categoryName)
+                .orElseThrow(() -> new ApiException(ErrorCode.PLAN_INFORMATION_INCOMPLETE,
+                        "지원하지 않는 AI 카테고리입니다: " + categoryName));
+        StoredImage image = images.findRandomActiveByCategoryCode(category.code())
+                .orElseThrow(() -> new ApiException(ErrorCode.IMAGE_NOT_FOUND_IN_CATEGORY));
         ObjectStorage.SignedUrl signed = storage.signedGetUrl(image.getStorageKey());
         return new ImageResult(image, signed.url(), signed.expiresAt());
     }
