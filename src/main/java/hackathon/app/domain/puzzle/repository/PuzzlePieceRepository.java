@@ -2,6 +2,7 @@ package hackathon.app.domain.puzzle.repository;
 
 import hackathon.app.domain.puzzle.entity.PuzzlePiece;
 import hackathon.app.domain.scheduleitem.entity.ScheduleItemStatus;
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -45,9 +46,29 @@ public interface PuzzlePieceRepository extends JpaRepository<PuzzlePiece, Long> 
     List<PieceCountProjection> countValidByPuzzleIds(@Param("puzzleIds") Collection<Long> puzzleIds,
                                                      @Param("cancelled") ScheduleItemStatus cancelled);
 
+    /** 랭킹 원본: 사용자별 최초 조각 획득 시각과 원본 작업. */
+    @Query("""
+            SELECT puzzle.userId AS userId,
+                   piece.scheduleItemId AS scheduleItemId,
+                   piece.earnedAt AS earnedAt
+            FROM PuzzlePiece piece, Puzzle puzzle
+            WHERE piece.puzzleId = puzzle.id
+              AND puzzle.userId IN :userIds
+            ORDER BY puzzle.userId ASC, piece.earnedAt ASC
+            """)
+    List<RankingActivityProjection> findRankingActivities(@Param("userIds") Collection<Long> userIds);
+
     interface PieceCountProjection {
         Long getPuzzleId();
 
         long getPieceCount();
+    }
+
+    interface RankingActivityProjection {
+        Long getUserId();
+
+        Long getScheduleItemId();
+
+        LocalDateTime getEarnedAt();
     }
 }

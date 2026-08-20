@@ -102,8 +102,39 @@ public interface ScheduleItemRepository extends JpaRepository<ScheduleItem, Long
             """)
     int nextStandalonePosition(@Param("userId") Long userId, @Param("date") LocalDate date);
 
+    /** 통계·랭킹을 위한 유효 작업 원본. 소프트 삭제는 @SQLRestriction으로 제외된다. */
+    @Query("""
+            SELECT i.id AS itemId,
+                   i.userId AS userId,
+                   s.id AS scheduleId,
+                   s.categoryId AS categoryId,
+                   i.scheduledDate AS scheduledDate,
+                   i.estimatedMinutes AS workload,
+                   i.status AS status
+            FROM ScheduleItem i
+            LEFT JOIN i.schedule s
+            WHERE i.userId IN :userIds
+            """)
+    List<RankingItemProjection> findRankingItems(@Param("userIds") Collection<Long> userIds);
+
     /** 스케줄 삭제 시 하위 작업 일괄 소프트 삭제 */
     @Modifying(flushAutomatically = true)
     @Query("UPDATE ScheduleItem i SET i.deletedAt = :now WHERE i.schedule.id = :scheduleId AND i.deletedAt IS NULL")
     int softDeleteAllBySchedule(@Param("scheduleId") Long scheduleId, @Param("now") LocalDateTime now);
+
+    interface RankingItemProjection {
+        Long getItemId();
+
+        Long getUserId();
+
+        Long getScheduleId();
+
+        Long getCategoryId();
+
+        LocalDate getScheduledDate();
+
+        Integer getWorkload();
+
+        ScheduleItemStatus getStatus();
+    }
 }

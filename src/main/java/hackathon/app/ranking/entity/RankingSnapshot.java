@@ -11,8 +11,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 
 /**
- * 배치가 미리 적재해 둔 랭킹 스냅샷. 이 API 는 읽기만 한다.
- * ddl-auto=validate 이므로 컬럼명·타입·nullable 이 ranking_snapshots DDL 과 정확히 일치해야 한다.
+ * 주기적으로 다시 계산하는 랭킹 스냅샷.
+ * 운영 스키마는 버전 관리되는 migration SQL 과 일치해야 한다.
  * user_id / category_id 는 FK 지만 연관관계를 매핑하지 않고 Long 값만 들고 있다
  * (User 는 다른 사람의 엔티티이고 Category 엔티티는 아직 이 레포에 없다).
  */
@@ -66,5 +66,33 @@ public class RankingSnapshot {
 
     protected RankingSnapshot() {
         // JPA 전용 기본 생성자
+    }
+
+    public static RankingSnapshot create(LocalDate rankingDate,
+                                         RankingType rankingType,
+                                         PeriodType periodType,
+                                         RankingScope scope,
+                                         Long categoryId,
+                                         Long userId,
+                                         int rankNo,
+                                         BigDecimal score,
+                                         int puzzleCount,
+                                         int activeDays,
+                                         BigDecimal achievementRate,
+                                         LocalDateTime createdAt) {
+        RankingSnapshot snapshot = new RankingSnapshot();
+        snapshot.rankingDate = rankingDate;
+        snapshot.rankingType = rankingType;
+        snapshot.periodType = periodType;
+        snapshot.scope = scope;
+        snapshot.categoryId = categoryId;
+        snapshot.userId = userId;
+        snapshot.rankNo = rankNo;
+        snapshot.score = score;
+        snapshot.puzzleCount = puzzleCount;
+        snapshot.activeDays = activeDays;
+        snapshot.achievementRate = achievementRate;
+        snapshot.createdAt = createdAt;
+        return snapshot;
     }
 }
