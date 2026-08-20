@@ -6,10 +6,9 @@ import tools.jackson.databind.JsonNode;
 
 public record AiGeneratePayload(
         String conversation_id,
-        String schedule_id,
         String goal_summary,
         String category,
         Map<String, Object> template_answers,
-        List<JsonNode> busy_dates,
+        List<BusyDatePayload> busy_dates,
         JsonNode long_term_context
 ) {}
