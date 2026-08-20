@@ -133,31 +133,29 @@ class PuzzleServiceTest {
     }
 
     @Test
-    @DisplayName("상세: 타인의 미완성 퍼즐은 403 PUZZLE_NOT_PUBLIC")
+    @DisplayName("내 퍼즐 상세: 타인의 미완성 퍼즐은 403 FORBIDDEN")
     void getPuzzle_othersIncomplete_forbidden() throws Exception {
         when(puzzleRepository.findById(PUZZLE_ID)).thenReturn(Optional.of(puzzle(false)));
 
         assertThatThrownBy(() -> service.getPuzzle(OTHER, PUZZLE_ID))
                 .isInstanceOf(ApiException.class)
                 .extracting(e -> ((ApiException) e).errorCode())
-                .isEqualTo(ErrorCode.PUZZLE_NOT_PUBLIC);
+                .isEqualTo(ErrorCode.FORBIDDEN);
     }
 
     @Test
-    @DisplayName("상세: 타인이라도 공개·완성 퍼즐은 조회할 수 있다")
-    void getPuzzle_othersCompletedPublic_allowed() throws Exception {
+    @DisplayName("내 퍼즐 상세: 공개·완성 퍼즐도 타인은 조회할 수 없다")
+    void getPuzzle_othersCompletedPublic_forbidden() throws Exception {
         when(puzzleRepository.findById(PUZZLE_ID)).thenReturn(Optional.of(puzzle(true)));
-        when(scheduleItemRepository.findBySchedule_IdOrderByScheduledDateAscPositionAscPriorityAscIdAsc(SCHEDULE_ID))
-                .thenReturn(List.of(item(1301L, "하체 운동")));
-        when(puzzlePieceRepository.findByPuzzleIdOrderByPositionAsc(PUZZLE_ID)).thenReturn(List.of());
 
-        PuzzleDetailResponse res = service.getPuzzle(OTHER, PUZZLE_ID);
-
-        assertThat(res.id()).isEqualTo(PUZZLE_ID);
+        assertThatThrownBy(() -> service.getPuzzle(OTHER, PUZZLE_ID))
+                .isInstanceOf(ApiException.class)
+                .extracting(e -> ((ApiException) e).errorCode())
+                .isEqualTo(ErrorCode.FORBIDDEN);
     }
 
     @Test
-    @DisplayName("상세: 타인의 비공개 완성 퍼즐은 조회할 수 없다")
+    @DisplayName("내 퍼즐 상세: 비공개·완성 퍼즐도 타인은 조회할 수 없다")
     void getPuzzle_othersCompletedPrivate_forbidden() throws Exception {
         when(puzzleRepository.findById(PUZZLE_ID))
                 .thenReturn(Optional.of(puzzle(true, PuzzleVisibility.PRIVATE)));
@@ -165,6 +163,6 @@ class PuzzleServiceTest {
         assertThatThrownBy(() -> service.getPuzzle(OTHER, PUZZLE_ID))
                 .isInstanceOf(ApiException.class)
                 .extracting(e -> ((ApiException) e).errorCode())
-                .isEqualTo(ErrorCode.PUZZLE_NOT_PUBLIC);
+                .isEqualTo(ErrorCode.FORBIDDEN);
     }
 }

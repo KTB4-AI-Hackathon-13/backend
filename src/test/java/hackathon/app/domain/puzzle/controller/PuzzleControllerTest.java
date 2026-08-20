@@ -109,11 +109,11 @@ class PuzzleControllerTest {
     @Test
     @DisplayName("GET /puzzles/{id} — 타인의 미완성 퍼즐이면 403")
     void getPuzzle_forbidden_returns403() throws Exception {
-        when(puzzleService.getPuzzle(1L, 7L)).thenThrow(new ApiException(ErrorCode.PUZZLE_NOT_PUBLIC));
+        when(puzzleService.getPuzzle(1L, 7L)).thenThrow(new ApiException(ErrorCode.FORBIDDEN));
 
         mockMvc.perform(get("/api/v1/puzzles/7").header("X-User-Id", "1"))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("PUZZLE_NOT_PUBLIC"));
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
     }
 
     @Test

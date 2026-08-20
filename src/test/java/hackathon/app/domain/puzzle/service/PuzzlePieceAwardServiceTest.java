@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import hackathon.app.domain.puzzle.entity.Puzzle;
 import hackathon.app.domain.puzzle.entity.PuzzlePiece;
 import hackathon.app.domain.puzzle.entity.PuzzleStatus;
+import hackathon.app.domain.puzzle.entity.PuzzleVisibility;
 import hackathon.app.domain.puzzle.repository.PuzzlePieceRepository;
 import hackathon.app.domain.puzzle.repository.PuzzleRepository;
 import hackathon.app.domain.schedule.entity.ChangeSource;
@@ -90,6 +91,12 @@ class PuzzlePieceAwardServiceTest {
             public long getPuzzleCount() { return total; }
             public long getCompletedPuzzleCount() { return 0; }
         };
+    }
+
+    @Test
+    @DisplayName("MVP에서 새 퍼즐은 PUBLIC으로 생성된다")
+    void newPuzzle_defaultsToPublic() throws Exception {
+        assertThat(puzzle().getVisibility()).isEqualTo(PuzzleVisibility.PUBLIC);
     }
 
     @Test

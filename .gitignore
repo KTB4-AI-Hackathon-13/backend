@@ -50,3 +50,6 @@ CLAUDE.md
 /docs
 !/docs/
 /docs/*
+!/docs/migration/
+/docs/migration/*
+!/docs/migration/2026-08-20_ranking_full_contract.sql
