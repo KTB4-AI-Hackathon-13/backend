@@ -85,6 +85,18 @@ public interface ScheduleItemRepository extends JpaRepository<ScheduleItem, Long
                               @Param("cancelled") ScheduleItemStatus cancelled,
                               @Param("excludeItemId") Long excludeItemId);
 
+    @Query("""
+            SELECT COUNT(i) FROM ScheduleItem i
+            WHERE i.userId = :userId
+              AND i.scheduledDate = :date
+              AND i.status <> :cancelled
+              AND (i.schedule IS NULL OR i.schedule.id <> :scheduleId)
+            """)
+    long countUserItemsOnDateExcludingSchedule(@Param("userId") Long userId,
+                                                @Param("date") LocalDate date,
+                                                @Param("cancelled") ScheduleItemStatus cancelled,
+                                                @Param("scheduleId") Long scheduleId);
+
     /** 같은 스케줄·같은 날짜의 다음 position (= 현재 최대 + 1, 없으면 0) */
     @Query("""
             SELECT COALESCE(MAX(i.position), -1) + 1 FROM ScheduleItem i
