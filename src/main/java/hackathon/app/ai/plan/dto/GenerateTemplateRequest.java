@@ -6,5 +6,5 @@ import jakarta.validation.constraints.Size;
 /** FE가 최초 목표를 입력할 때 사용하는 요청. */
 public record GenerateTemplateRequest(
         @NotBlank String conversationId,
-        @NotBlank @Size(max = 500) String message
+        @NotBlank @Size(max = 500) String text
 ) {}
