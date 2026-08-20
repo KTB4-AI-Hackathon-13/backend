@@ -60,7 +60,11 @@
 | ✅ 사용자 스케줄 생성 | POST | `/schedules` | O | `title`, `description?`, `startDate`, `endDate` | 생성 스케줄, 퍼즐 수 0 | `schedules`, `schedule_change_logs` |
 | 회원가입 | POST | `/auth/signup` | X | `email`, `password`, `passwordConfirmation`, `nickname`, `termsAgreed`, `privacyAgreed` | `userId`, `email`, `nickname` | `users`, `user_auth_accounts` |
 | 로그인 | POST | `/auth/login` | X | `email`, `password` | 사용자 요약, 세션 쿠키 | `users`, `auth_sessions` |
+| 카카오 로그인 시작 | GET | `/auth/oauth/kakao` | X | 없음 | 카카오 동의 화면으로 302 이동, `OAUTH_STATE` 쿠키 | 없음 |
+| 카카오 로그인 콜백 | GET | `/auth/oauth/kakao/callback` | X | `code`, `state` | 계정 가입·연결 후 `SESSION` 쿠키, FE로 302 이동 | `users`, `user_auth_accounts`, `auth_sessions` |
 | 로그아웃 | POST | `/auth/logout` | O | 없음 | 204 | `auth_sessions` |
+
+카카오 로그인은 `KAKAO_REST_API_KEY`, `KAKAO_CLIENT_SECRET`, `KAKAO_REDIRECT_URI`, `KAKAO_FRONTEND_REDIRECT_URI`로 설정한다. 콜백의 `state`는 5분 유효 HttpOnly 쿠키와 비교한다. 인증된 이메일이 제공되면 실제 이메일을 사용하고, 없으면 `kakao_{회원번호}@oauth.local` 내부 이메일로 가입한다.
 | 내 정보 조회 | GET | `/users/me` | O | 없음 | `id`, `email`, `nickname`, `profileImageUrl`, `timezone` | `users`, `images` |
 | 내 정보 수정 | PATCH | `/users/me` | O | `nickname?`, `profileImageId?`, `timezone?` | 수정된 회원 정보 | `users` |
 | 비밀번호 변경 | PATCH | `/users/me/password` | O | `currentPassword`, `newPassword`, `newPasswordConfirmation` | 204 | `users`, `auth_sessions` |
