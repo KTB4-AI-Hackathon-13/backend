@@ -29,6 +29,6 @@ public class ConversationTurnPersistenceService {
             return null;
         }
         return planPersistenceService.save(
-                userId, conversationId, request.goal_summary(), result.plan());
+                userId, conversationId, request.goal_summary(), result.category(), result.plan());
     }
 }

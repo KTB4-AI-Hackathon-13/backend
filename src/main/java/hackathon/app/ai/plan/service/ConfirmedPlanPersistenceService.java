@@ -2,6 +2,8 @@ package hackathon.app.ai.plan.service;
 
 import hackathon.app.ai.plan.dto.DailyTask;
 import hackathon.app.ai.plan.dto.SchedulePlan;
+import hackathon.app.category.CategoryType;
+import hackathon.app.category.repository.CategoryRepository;
 import hackathon.app.common.error.ApiException;
 import hackathon.app.common.error.ErrorCode;
 import hackathon.app.conversation.ConversationException;
@@ -16,6 +18,7 @@ import hackathon.app.domain.schedule.repository.ScheduleRepository;
 import hackathon.app.domain.schedule.service.ScheduleChangeLogger;
 import hackathon.app.domain.scheduleitem.entity.ScheduleItem;
 import hackathon.app.domain.scheduleitem.entity.ScheduleItemStatus;
+import hackathon.app.domain.scheduleitem.entity.ScheduleItemType;
 import hackathon.app.domain.scheduleitem.policy.DailyTaskLimitProvider;
 import hackathon.app.domain.scheduleitem.repository.ScheduleItemRepository;
 import java.time.Clock;
@@ -38,6 +41,7 @@ public class ConfirmedPlanPersistenceService {
     private static final long NO_EXCLUDE = -1L;
 
     private final ConversationRepository conversationRepository;
+    private final CategoryRepository categoryRepository;
     private final ScheduleRepository scheduleRepository;
     private final ScheduleItemRepository itemRepository;
     private final ScheduleChangeLogger changeLogger;
@@ -46,14 +50,15 @@ public class ConfirmedPlanPersistenceService {
     private final Clock clock;
 
     @Transactional
-    public Long save(Long userId, String conversationId, String goalSummary, SchedulePlan plan) {
+    public Long save(Long userId, String conversationId, String goalSummary, String category, SchedulePlan plan) {
         Conversation conversation = conversationRepository.findOwnedForUpdate(conversationId, userId)
                 .orElseThrow(ConversationException::notFound);
+        Long categoryId = resolveCategoryId(category);
         if (conversation.getScheduleId() != null) {
             Schedule existing = scheduleRepository.findById(conversation.getScheduleId())
                     .orElseThrow(() -> new ApiException(ErrorCode.SCHEDULE_NOT_FOUND));
             if (!existing.isOwnedBy(userId)) throw new ApiException(ErrorCode.FORBIDDEN);
-            return updateExisting(userId, existing, goalSummary, plan);
+            return updateExisting(userId, existing, goalSummary, categoryId, plan);
         }
 
         List<DailyTask> tasks = validate(plan);
@@ -63,6 +68,7 @@ public class ConfirmedPlanPersistenceService {
 
         Schedule schedule = scheduleRepository.save(Schedule.builder()
                 .userId(userId)
+                .categoryId(categoryId)
                 .title(goalSummary.length() <= 200 ? goalSummary : goalSummary.substring(0, 200))
                 .description(plan.summary())
                 .status(ScheduleStatus.ACTIVE)
@@ -74,12 +80,11 @@ public class ConfirmedPlanPersistenceService {
         for (DailyTask task : tasks) {
             ScheduleItem item = ScheduleItem.builder()
                     .schedule(schedule)
-                    .categoryId(null)
                     .title(task.title())
                     .description(task.description())
                     .scheduledDate(task.scheduled_date())
-                    .workload(null)
                     .estimatedMinutes(task.estimated_min())
+                    .itemType(ScheduleItemType.ETC)
                     .priority(3)
                     .position(itemRepository.nextPosition(schedule.getId(), task.scheduled_date()))
                     .source(ChangeSource.AI)
@@ -95,7 +100,8 @@ public class ConfirmedPlanPersistenceService {
         return schedule.getId();
     }
 
-    private Long updateExisting(Long userId, Schedule schedule, String goalSummary, SchedulePlan plan) {
+    private Long updateExisting(Long userId, Schedule schedule, String goalSummary,
+                                Long categoryId, SchedulePlan plan) {
         List<DailyTask> tasks = validate(plan);
         List<ScheduleItem> existingItems = itemRepository
                 .findBySchedule_IdOrderByScheduledDateAscPositionAscPriorityAscIdAsc(schedule.getId());
@@ -140,6 +146,7 @@ public class ConfirmedPlanPersistenceService {
                         .description(task.description())
                         .scheduledDate(task.scheduled_date())
                         .estimatedMinutes(task.estimated_min())
+                        .itemType(ScheduleItemType.ETC)
                         .priority(3)
                         .position(itemRepository.nextPosition(schedule.getId(), task.scheduled_date()))
                         .source(ChangeSource.AI)
@@ -185,7 +192,7 @@ public class ConfirmedPlanPersistenceService {
                     .min(LocalDate::compareTo).orElseThrow();
             LocalDate end = activeItems.stream().map(ScheduleItem::getScheduledDate)
                     .max(LocalDate::compareTo).orElseThrow();
-            schedule.update(truncate(goalSummary), plan.summary(), start, end, null);
+            schedule.update(truncate(goalSummary), plan.summary(), start, end, categoryId);
         }
         puzzlePieceAwardService.refreshOnItemsChanged(schedule);
         return schedule.getId();
@@ -197,6 +204,16 @@ public class ConfirmedPlanPersistenceService {
         } catch (NumberFormatException exception) {
             throw new ApiException(ErrorCode.INVALID_REQUEST, "올바르지 않은 작업 ID입니다: " + value);
         }
+    }
+
+    private Long resolveCategoryId(String value) {
+        CategoryType category = CategoryType.fromDisplayName(value)
+                .orElseThrow(() -> new ApiException(ErrorCode.PLAN_INFORMATION_INCOMPLETE,
+                        "지원하지 않는 AI 카테고리입니다: " + value));
+        return categoryRepository.findByNameAndActiveTrue(category.displayName())
+                .orElseThrow(() -> new ApiException(ErrorCode.INVALID_REQUEST,
+                        "활성 카테고리를 찾을 수 없습니다: " + category.code()))
+                .getId();
     }
 
     private void validateExistingDailyLimits(Long userId, Long scheduleId,
@@ -223,9 +240,11 @@ public class ConfirmedPlanPersistenceService {
         }
         for (DailyTask task : plan.daily_tasks()) {
             if (task == null || task.scheduled_date() == null || task.title() == null || task.title().isBlank()
-                    || task.title().length() > 200
+                    || task.title().length() > 100
+                    || (task.description() != null && task.description().length() > 1000)
                     || task.estimated_min() == null
-                    || task.estimated_min() < 1) {
+                    || task.estimated_min() < 1
+                    || task.estimated_min() > 1440) {
                 throw new ApiException(ErrorCode.PLAN_INFORMATION_INCOMPLETE);
             }
         }
@@ -252,6 +271,8 @@ public class ConfirmedPlanPersistenceService {
         value.put("description", item.getDescription());
         value.put("scheduledDate", item.getScheduledDate());
         value.put("estimatedMinutes", item.getEstimatedMinutes());
+        value.put("itemType", item.getItemType());
+        value.put("priority", item.getPriority());
         value.put("status", item.getStatus());
         return value;
     }
