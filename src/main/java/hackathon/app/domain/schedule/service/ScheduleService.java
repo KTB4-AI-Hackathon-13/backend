@@ -1,6 +1,7 @@
 package hackathon.app.domain.schedule.service;
 
 import hackathon.app.domain.schedule.dto.ScheduleDetailResponse;
+import hackathon.app.domain.schedule.dto.ScheduleCreateRequest;
 import hackathon.app.domain.schedule.dto.ScheduleSummaryResponse;
 import hackathon.app.domain.schedule.dto.ScheduleUpdateRequest;
 import hackathon.app.domain.schedule.entity.ChangeAction;
@@ -46,6 +47,29 @@ public class ScheduleService {
     private final ScheduleItemRepository scheduleItemRepository;
     private final ScheduleChangeLogger changeLogger;
     private final Clock clock;
+
+    /** POST /schedules — 사용자가 직접 빈 스케줄 생성 */
+    @Transactional
+    public ScheduleSummaryResponse createSchedule(Long userId, ScheduleCreateRequest request) {
+        if (request.startDate().isAfter(request.endDate())) {
+            throw new ApiException(ErrorCode.INVALID_SCHEDULE_PERIOD);
+        }
+
+        Schedule schedule = scheduleRepository.save(Schedule.builder()
+                .userId(userId)
+                .title(request.title())
+                .description(request.description())
+                .status(ScheduleStatus.ACTIVE)
+                .source(ChangeSource.USER)
+                .startDate(request.startDate())
+                .endDate(request.endDate())
+                .build());
+
+        changeLogger.log(schedule.getId(), null, userId, ChangeAction.CREATE, ChangeSource.USER,
+                schedule.getCurrentVersion(), null, snapshot(schedule), null);
+
+        return ScheduleSummaryResponse.of(schedule, 0, 0);
+    }
 
     /** GET /schedules — id 내림차순 커서 페이징 + 스케줄별 퍼즐 수 */
     public CursorPage<ScheduleSummaryResponse> getSchedules(Long userId, ScheduleStatus status,

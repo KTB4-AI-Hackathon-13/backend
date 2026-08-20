@@ -56,6 +56,7 @@
 
 | 기능 | Method | URL | 인증 | 주요 요청값 | 주요 응답값 | 연결 테이블 |
 |---|---|---|---:|---|---|---|
+| ✅ 사용자 스케줄 생성 | POST | `/schedules` | O | `title`, `description?`, `startDate`, `endDate` | 생성 스케줄, 퍼즐 수 0 | `schedules`, `schedule_change_logs` |
 | 회원가입 | POST | `/auth/signup` | X | `email`, `password`, `passwordConfirmation`, `nickname`, `termsAgreed`, `privacyAgreed` | `userId`, `email`, `nickname` | `users`, `user_auth_accounts` |
 | 로그인 | POST | `/auth/login` | X | `email`, `password` | 사용자 요약, 세션 쿠키 | `users`, `auth_sessions` |
 | 로그아웃 | POST | `/auth/logout` | O | 없음 | 204 | `auth_sessions` |
