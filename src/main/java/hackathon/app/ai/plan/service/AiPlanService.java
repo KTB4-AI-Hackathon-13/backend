@@ -5,9 +5,13 @@ import hackathon.app.ai.plan.dto.*;
 import hackathon.app.common.error.ApiException;
 import hackathon.app.common.error.ErrorCode;
 import hackathon.app.conversation.ConversationRepository;
+import hackathon.app.domain.scheduleitem.entity.ScheduleItem;
+import hackathon.app.domain.scheduleitem.entity.ScheduleItemStatus;
+import hackathon.app.domain.scheduleitem.repository.ScheduleItemRepository;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +27,7 @@ public class AiPlanService {
     private final AiPlanConversationRecorder conversationRecorder;
     private final ConfirmedPlanPersistenceService confirmedPlanPersistenceService;
     private final ImageService imageService;
+    private final ScheduleItemRepository scheduleItemRepository;
 
     public TemplateResponse generateTemplate(Long userId, GenerateTemplateRequest request) {
         validateConversation(userId, request.conversationId());
@@ -49,10 +54,11 @@ public class AiPlanService {
 
     public PlanTurnResponse generate(Long userId, GenerateScheduleRequest request) {
         validateConversation(userId, request.conversationId());
-        validateTemplateAnswers(request.templateAnswers());
+        DateRange range = validateTemplateAnswers(request.templateAnswers());
+        List<BusyDatePayload> busyDates = buildBusyDates(userId, range);
         PlanTurnResponse response = validatePlanTurn(aiPlanClient.generate(new AiGeneratePayload(
                 request.conversationId(), request.goalSummary(), request.category(),
-                request.templateAnswers(), emptyIfNull(request.busyDates()), request.longTermContext())));
+                request.templateAnswers(), busyDates, request.longTermContext())));
         conversationRecorder.append(userId, request.conversationId(), request, response,
                 AiPlanConversationRecorder.PLAN_TURN);
         return response;
@@ -88,26 +94,49 @@ public class AiPlanService {
         }
     }
 
-    private void validateTemplateAnswers(Map<String, Object> answers) {
+    private DateRange validateTemplateAnswers(Map<String, Object> answers) {
         if (answers == null) {
             throw new ApiException(ErrorCode.INVALID_REQUEST, "templateAnswers는 필수입니다.");
         }
-        validateDateAnswer(answers, "start_date");
-        validateDateAnswer(answers, "end_date");
+        LocalDate start = dateAnswer(answers, "start_date");
+        LocalDate end = dateAnswer(answers, "end_date");
+        if (start.isAfter(end)) {
+            throw new ApiException(ErrorCode.INVALID_REQUEST, "start_date는 end_date보다 늦을 수 없습니다.");
+        }
+        return new DateRange(start, end);
     }
 
-    private void validateDateAnswer(Map<String, Object> answers, String key) {
+    private LocalDate dateAnswer(Map<String, Object> answers, String key) {
         Object value = answers.get(key);
         if (!(value instanceof String text) || text.isBlank()) {
             throw new ApiException(ErrorCode.INVALID_REQUEST, "templateAnswers." + key + "는 필수입니다.");
         }
         try {
-            LocalDate.parse(text);
+            return LocalDate.parse(text);
         } catch (DateTimeParseException exception) {
             throw new ApiException(ErrorCode.INVALID_REQUEST,
                     "templateAnswers." + key + "는 YYYY-MM-DD 형식이어야 합니다.");
         }
     }
+
+    private List<BusyDatePayload> buildBusyDates(Long userId, DateRange range) {
+        List<ScheduleItem> items = scheduleItemRepository.findByUserIdAndDateBetween(
+                userId, range.start(), range.end());
+        Map<LocalDate, Integer> countsByDate = new LinkedHashMap<>();
+        for (ScheduleItem item : items) {
+            if (item.getStatus() != ScheduleItemStatus.TODO
+                    && item.getStatus() != ScheduleItemStatus.IN_PROGRESS
+                    && item.getStatus() != ScheduleItemStatus.SKIPPED) {
+                continue;
+            }
+            countsByDate.merge(item.getScheduledDate(), 1, Integer::sum);
+        }
+        return countsByDate.entrySet().stream()
+                .map(entry -> new BusyDatePayload(entry.getKey(), entry.getValue()))
+                .toList();
+    }
+
+    private record DateRange(LocalDate start, LocalDate end) {}
 
     private PlanTurnResponse validatePlanTurn(PlanTurnResponse response) {
         if (response.assistant_message() == null || response.assistant_message().isBlank()
