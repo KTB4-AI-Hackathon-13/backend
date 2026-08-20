@@ -111,6 +111,35 @@ class ScheduleServiceTest {
     }
 
     @Test
+    @DisplayName("수정: 기간이 30일을 넘으면 SCHEDULE_PERIOD_TOO_LONG(422), outside-items 쿼리 없이 즉시 거부")
+    void updateSchedule_periodLongerThan30Days_throws() {
+        when(scheduleRepository.findById(SCHEDULE_ID)).thenReturn(Optional.of(schedule));
+        ScheduleUpdateRequest request = new ScheduleUpdateRequest(null, null, null, LocalDate.of(2026, 10, 1));
+
+        assertThatThrownBy(() -> scheduleService.updateSchedule(USER_ID, SCHEDULE_ID, request))
+                .isInstanceOf(ApiException.class)
+                .extracting(e -> ((ApiException) e).errorCode())
+                .isEqualTo(ErrorCode.SCHEDULE_PERIOD_TOO_LONG);
+        verify(scheduleItemRepository, never()).countOutsidePeriod(any(), any(), any(), any());
+        assertThat(schedule.getCurrentVersion()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("수정: 정확히 30일이면 통과 (경계값)")
+    void updateSchedule_exactly30Days_succeeds() {
+        when(scheduleRepository.findById(SCHEDULE_ID)).thenReturn(Optional.of(schedule));
+        when(scheduleItemRepository.countOutsidePeriod(any(), eq(LocalDate.of(2026, 8, 17)),
+                eq(LocalDate.of(2026, 9, 15)), eq(ScheduleItemStatus.CANCELLED))).thenReturn(0L);
+        when(scheduleItemRepository.countPuzzlesByScheduleIds(anyList(), eq(ScheduleItemStatus.COMPLETED),
+                eq(ScheduleItemStatus.CANCELLED))).thenReturn(List.of());
+        ScheduleUpdateRequest request = new ScheduleUpdateRequest(null, null, null, LocalDate.of(2026, 9, 15));
+
+        ScheduleSummaryResponse response = scheduleService.updateSchedule(USER_ID, SCHEDULE_ID, request);
+
+        assertThat(response.endDate()).isEqualTo(LocalDate.of(2026, 9, 15));
+    }
+
+    @Test
     @DisplayName("수정: 새 기간 밖에 작업이 있으면 ITEMS_OUTSIDE_SCHEDULE_PERIOD(409), 버전 유지")
     void updateSchedule_itemsOutsidePeriod_throwsConflict() {
         when(scheduleRepository.findById(SCHEDULE_ID)).thenReturn(Optional.of(schedule));

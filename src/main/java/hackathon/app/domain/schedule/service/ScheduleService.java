@@ -39,6 +39,8 @@ public class ScheduleService {
 
     public static final int DEFAULT_PAGE_SIZE = 20;
     public static final int MAX_PAGE_SIZE = 100;
+    /** 스케줄 기간 상한(일). AI 계획 생성 시 최대 30일과 동일한 기준 — 사용자가 직접 수정할 때도 넘을 수 없다. */
+    public static final int MAX_SCHEDULE_PERIOD_DAYS = 30;
 
     private final ScheduleRepository scheduleRepository;
     private final ScheduleItemRepository scheduleItemRepository;
@@ -99,6 +101,10 @@ public class ScheduleService {
         }
         boolean periodChanged = !newStart.equals(schedule.getStartDate()) || !newEnd.equals(schedule.getEndDate());
         if (periodChanged) {
+            long periodDays = ChronoUnit.DAYS.between(newStart, newEnd) + 1;
+            if (periodDays > MAX_SCHEDULE_PERIOD_DAYS) {
+                throw new ApiException(ErrorCode.SCHEDULE_PERIOD_TOO_LONG);
+            }
             long outside = scheduleItemRepository.countOutsidePeriod(
                     scheduleId, newStart, newEnd, ScheduleItemStatus.CANCELLED);
             if (outside > 0) {
