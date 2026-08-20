@@ -60,7 +60,11 @@
 | ✅ 사용자 스케줄 생성 | POST | `/schedules` | O | `title`, `description?`, `startDate`, `endDate` | 생성 스케줄, 퍼즐 수 0 | `schedules`, `schedule_change_logs` |
 | 회원가입 | POST | `/auth/signup` | X | `email`, `password`, `passwordConfirmation`, `nickname`, `termsAgreed`, `privacyAgreed` | `userId`, `email`, `nickname` | `users`, `user_auth_accounts` |
 | 로그인 | POST | `/auth/login` | X | `email`, `password` | 사용자 요약, 세션 쿠키 | `users`, `auth_sessions` |
+| 카카오 로그인 시작 | GET | `/auth/oauth/kakao` | X | 없음 | 카카오 동의 화면으로 302 이동, `OAUTH_STATE` 쿠키 | 없음 |
+| 카카오 로그인 콜백 | GET | `/auth/oauth/kakao/callback` | X | `code`, `state` | 계정 가입·연결 후 `SESSION` 쿠키, FE로 302 이동 | `users`, `user_auth_accounts`, `auth_sessions` |
 | 로그아웃 | POST | `/auth/logout` | O | 없음 | 204 | `auth_sessions` |
+
+카카오 로그인은 `KAKAO_REST_API_KEY`, `KAKAO_CLIENT_SECRET`, `KAKAO_REDIRECT_URI`, `KAKAO_FRONTEND_REDIRECT_URI`로 설정한다. 콜백의 `state`는 5분 유효 HttpOnly 쿠키와 비교한다. 인증된 이메일이 제공되면 실제 이메일을 사용하고, 없으면 `kakao_{회원번호}@oauth.local` 내부 이메일로 가입한다.
 | 내 정보 조회 | GET | `/users/me` | O | 없음 | `id`, `email`, `nickname`, `profileImageUrl`, `timezone` | `users`, `images` |
 | 내 정보 수정 | PATCH | `/users/me` | O | `nickname?`, `profileImageId?`, `timezone?` | 수정된 회원 정보 | `users` |
 | 비밀번호 변경 | PATCH | `/users/me/password` | O | `currentPassword`, `newPassword`, `newPasswordConfirmation` | 204 | `users`, `auth_sessions` |
@@ -139,6 +143,8 @@ BE가 외부 AI 서버에 요청하고 응답을 기다린 뒤, 검증과 저장
 | ✅ AI 계획 수정 | POST | `/schedules/{scheduleId}/ai-revisions` | O | `conversationId`, `goalSummary`, `category`, `templateAnswers`, `currentPlan`, `userMessage` | 확정 시 저장된 스케줄 ID, AI `category`, 무작위 이미지 URL | `schedules`, `schedule_items`, `categories`, `images` |
 
 AI 응답의 `estimated_min`은 `schedule_items.estimated_minutes`, `summary`는 `schedules.description`에 저장한다. 외부 AI 설정은 `AI_BASE_URL`, `AI_CONNECT_TIMEOUT_SECONDS`, `AI_READ_TIMEOUT_SECONDS`를 사용한다.
+
+`/ai-generations`의 `busy_dates`는 FE 입력을 사용하지 않는다. BE가 `templateAnswers.start_date/end_date`를 파싱하고 로그인 `userId`의 해당 기간 `schedule_items`를 조회한다. 삭제 작업과 `CANCELLED`는 제외하며 날짜별 일정 개수를 `{"date":"YYYY-MM-DD","event_count":N}` 형식으로 AI `/plan/generate`에 전달한다.
 
 `/ai-revisions`에서 외부 AI 응답이 `confirmed: true`이면 응답 최상위 한글 `category`를 Java `CategoryType`으로 검증하고 영문 코드로 변환한다. 활성 `categories.code`가 같은 삭제되지 않은 이미지 중 하나를 무작위로 선택하고 `image_id`, 새 S3 서명 `image_url`, `image_url_expires_at`을 함께 반환한다. 지원 카테고리는 운동·다이어트·음악·공부·어학·커리어·습관·마인드셋·인간관계·취미이다.
 
