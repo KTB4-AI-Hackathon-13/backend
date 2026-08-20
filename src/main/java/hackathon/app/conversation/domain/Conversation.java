@@ -5,7 +5,8 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "conversations")
+@Table(name = "conversations", uniqueConstraints =
+        @UniqueConstraint(name = "uk_conversations_schedule", columnNames = "schedule_id"))
 public class Conversation {
     @Id @Column(length = 36, nullable = false)
     private String id;
@@ -45,6 +46,8 @@ public class Conversation {
         this.scheduleId = scheduleId;
         this.updatedAt = now;
     }
+    public void rename(String value, LocalDateTime now) { title = value; updatedAt = now; }
+    public void attachSchedule(Long value, LocalDateTime now) { scheduleId = value; updatedAt = now; }
     public String getId() { return id; }
     public Long getOwnerUserId() { return ownerUserId; }
     public Long getScheduleId() { return scheduleId; }

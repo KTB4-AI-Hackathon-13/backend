@@ -31,7 +31,7 @@ public class ScheduleItemController {
 
     private final ScheduleItemService scheduleItemService;
 
-    /** 계획 없이 작업 추가 → 1일 스케줄 자동 생성 → 201 */
+    /** 계획 없이 단독 작업 생성 → 201 */
     @PostMapping("/schedule-items")
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<ScheduleItemResponse> createStandaloneItem(

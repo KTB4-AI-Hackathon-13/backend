@@ -1,11 +1,10 @@
 package hackathon.app.ranking.enums;
 
-/**
- * 랭킹 집계 기간. 요청에 period 가 없으면 WEEKLY 다.
- * DB ranking_snapshots.period_type ENUM 과 값이 일치해야 한다.
- */
+/** API 기간 필터와 ranking_snapshots.period_type 컬럼의 공통 값. */
 public enum PeriodType {
+    DAILY,
     WEEKLY,
     MONTHLY,
-    YEARLY
+    YEARLY,
+    ALL
 }

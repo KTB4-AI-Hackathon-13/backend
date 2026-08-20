@@ -18,17 +18,19 @@ public class UserPreferenceController {
         Boolean weekendScheduleEnabled, Boolean aiRescheduleEnabled,
         Boolean notificationEnabled, PuzzleVisibility defaultPuzzleVisibility,
         Boolean rankingParticipationEnabled, Boolean galleryNicknameVisible,
-        Boolean likeNotificationEnabled, Boolean rankingChangeNotificationEnabled) {}
+        Boolean likeNotificationEnabled, Boolean rankingChangeNotificationEnabled,
+        @Min(1) @Max(1440) Integer dailyAvailableMinutes) {}
     public record PreferenceResponse(int maxDailyTasks, boolean weekendScheduleEnabled,
         boolean aiRescheduleEnabled, boolean notificationEnabled,
         PuzzleVisibility defaultPuzzleVisibility, boolean rankingParticipationEnabled,
         boolean galleryNicknameVisible, boolean likeNotificationEnabled,
-        boolean rankingChangeNotificationEnabled) {
+        boolean rankingChangeNotificationEnabled, Integer dailyAvailableMinutes) {
         static PreferenceResponse from(UserPreference p) {
             return new PreferenceResponse(p.getMaxDailyTasks(), p.isWeekendScheduleEnabled(),
                 p.isAiRescheduleEnabled(), p.isNotificationEnabled(), p.getDefaultPuzzleVisibility(),
                 p.isRankingParticipationEnabled(), p.isGalleryNicknameVisible(),
-                p.isLikeNotificationEnabled(), p.isRankingChangeNotificationEnabled());
+                p.isLikeNotificationEnabled(), p.isRankingChangeNotificationEnabled(),
+                p.getDailyAvailableMinutes());
         }
     }
     @GetMapping
@@ -42,7 +44,8 @@ public class UserPreferenceController {
             request.maxDailyTasks(), request.weekendScheduleEnabled(), request.aiRescheduleEnabled(),
             request.notificationEnabled(), request.defaultPuzzleVisibility(),
             request.rankingParticipationEnabled(), request.galleryNicknameVisible(),
-            request.likeNotificationEnabled(), request.rankingChangeNotificationEnabled()));
+            request.likeNotificationEnabled(), request.rankingChangeNotificationEnabled(),
+            request.dailyAvailableMinutes()));
         return ApiResponse.of(PreferenceResponse.from(updated));
     }
 }

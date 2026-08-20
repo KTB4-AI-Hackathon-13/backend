@@ -26,19 +26,27 @@ import hackathon.app.user.infrastructure.JpaUserRepository;
 @RequiredArgsConstructor
 public class RankingService {
 
-    /** 상위 몇 명까지 내려줄지. 요청으로 조절하지 않고 고정한다. */
-    private static final int RANKING_SIZE = 50;
+    private static final int DEFAULT_RANKING_SIZE = 50;
+    private static final int MAX_RANKING_SIZE = 100;
     private static final int FIRST_PAGE = 0;
-    private static final PeriodType DEFAULT_PERIOD = PeriodType.WEEKLY; // 디폴트는 주간랭킹
+    private static final PeriodType DEFAULT_PERIOD = PeriodType.ALL;
 
     private final RankingSnapshotRepository rankingSnapshotRepository;
+    private final RankingSnapshotRefreshService rankingSnapshotRefreshService;
     private final AuthSessionJpaRepository authSessionRepository;
     private final JpaUserRepository userRepository;
 
-    public GetRankingResponse getRankings(String sessionId, String type, Long categoryId, String period) {
+    public GetRankingResponse getRankings(String sessionId, String type, Long categoryId, String period,
+                                          Integer size) {
         RankingType rankingType = parseType(type);
         PeriodType periodType = parsePeriod(period);
+        if (categoryId != null && categoryId <= 0) {
+            throw new IllegalArgumentException("categoryId: 1 이상이어야 합니다.");
+        }
+        int pageSize = normalizeSize(size);
         RankingScope scope = (categoryId == null) ? RankingScope.OVERALL : RankingScope.CATEGORY;
+
+        rankingSnapshotRefreshService.refreshIfStale();
 
         LocalDate rankingDate =
                 rankingSnapshotRepository.findLatestRankingDate(rankingType, periodType, scope, categoryId);
@@ -48,7 +56,7 @@ public class RankingService {
 
         List<RankingSnapshot> snapshots = rankingSnapshotRepository.findTopRankings(
                 rankingDate, rankingType, periodType, scope, categoryId,
-                PageRequest.of(FIRST_PAGE, RANKING_SIZE));
+                PageRequest.of(FIRST_PAGE, pageSize));
         RankingSnapshot mySnapshot =
                 findMySnapshot(sessionId, rankingDate, rankingType, periodType, scope, categoryId);
         long participants = (mySnapshot == null)
@@ -102,6 +110,9 @@ public class RankingService {
     }
 
     private RankingType parseType(String type) {
+        if (type == null || type.isBlank()) {
+            throw new IllegalArgumentException("type: 필수 파라미터입니다.");
+        }
         try {
             return RankingType.valueOf(type);
         } catch (IllegalArgumentException exception) {
@@ -118,5 +129,15 @@ public class RankingService {
         } catch (IllegalArgumentException exception) {
             throw new IllegalArgumentException("period: 허용되지 않는 값입니다: " + period);
         }
+    }
+
+    private int normalizeSize(Integer size) {
+        if (size == null) {
+            return DEFAULT_RANKING_SIZE;
+        }
+        if (size < 1 || size > MAX_RANKING_SIZE) {
+            throw new IllegalArgumentException("size: 1~" + MAX_RANKING_SIZE + " 범위여야 합니다.");
+        }
+        return size;
     }
 }

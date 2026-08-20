@@ -157,16 +157,14 @@ class PuzzleServiceTest {
     }
 
     @Test
-    @DisplayName("상세: 타인의 비공개 값이 남은 완성 퍼즐도 조회할 수 있다")
-    void getPuzzle_othersCompletedPrivate_allowed() throws Exception {
+    @DisplayName("상세: 타인의 비공개 완성 퍼즐은 조회할 수 없다")
+    void getPuzzle_othersCompletedPrivate_forbidden() throws Exception {
         when(puzzleRepository.findById(PUZZLE_ID))
                 .thenReturn(Optional.of(puzzle(true, PuzzleVisibility.PRIVATE)));
-        when(scheduleItemRepository.findBySchedule_IdOrderByScheduledDateAscPositionAscPriorityAscIdAsc(SCHEDULE_ID))
-                .thenReturn(List.of(item(1301L, "하체 운동")));
-        when(puzzlePieceRepository.findByPuzzleIdOrderByPositionAsc(PUZZLE_ID)).thenReturn(List.of());
 
-        PuzzleDetailResponse res = service.getPuzzle(OTHER, PUZZLE_ID);
-
-        assertThat(res.id()).isEqualTo(PUZZLE_ID);
+        assertThatThrownBy(() -> service.getPuzzle(OTHER, PUZZLE_ID))
+                .isInstanceOf(ApiException.class)
+                .extracting(e -> ((ApiException) e).errorCode())
+                .isEqualTo(ErrorCode.PUZZLE_NOT_PUBLIC);
     }
 }

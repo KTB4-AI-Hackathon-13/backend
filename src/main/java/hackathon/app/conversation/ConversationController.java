@@ -1,6 +1,7 @@
 package hackathon.app.conversation;
 
 import hackathon.app.common.api.ApiResponse;
+import hackathon.app.ai.plan.service.ConversationPlanService;
 import hackathon.app.conversation.dto.request.*;
 import hackathon.app.conversation.dto.response.*;
 import hackathon.app.global.auth.LoginUser;
@@ -13,8 +14,12 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/conversations")
 public class ConversationController {
     private final ConversationService service;
+    private final ConversationPlanService planService;
 
-    public ConversationController(ConversationService service) { this.service = service; }
+    public ConversationController(ConversationService service, ConversationPlanService planService) {
+        this.service = service;
+        this.planService = planService;
+    }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -40,8 +45,23 @@ public class ConversationController {
 
     @PostMapping("/{conversationId}/messages")
     @ResponseStatus(HttpStatus.CREATED)
-    ApiResponse<MessageExchangeResponse> send(@LoginUser LoginUserInfo loginUser, @PathVariable String conversationId,
+    ApiResponse<ConversationTurnResponse> send(@LoginUser LoginUserInfo loginUser, @PathVariable String conversationId,
             @Valid @RequestBody MessageRequest body) {
-        return ApiResponse.of(service.send(loginUser.userId(), conversationId, body.message()));
+        return ApiResponse.of(planService.turn(loginUser.userId(), conversationId, body));
+    }
+
+    @PostMapping("/{conversationId}/messages/{messageId}/revisions")
+    @ResponseStatus(HttpStatus.CREATED)
+    ApiResponse<MessageResponse> revise(@LoginUser LoginUserInfo loginUser,
+            @PathVariable String conversationId, @PathVariable String messageId,
+            @Valid @RequestBody MessageRequest body) {
+        return ApiResponse.of(service.revise(loginUser.userId(), conversationId, messageId, body.message()));
+    }
+
+    @PatchMapping("/{conversationId}")
+    ApiResponse<ConversationResponse> archive(@LoginUser LoginUserInfo loginUser,
+            @PathVariable String conversationId,
+            @Valid @RequestBody UpdateConversationRequest body) {
+        return ApiResponse.of(service.archive(loginUser.userId(), conversationId, body.status()));
     }
 }

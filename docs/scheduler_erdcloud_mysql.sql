@@ -65,6 +65,7 @@ CREATE TABLE user_preferences (
 
 CREATE TABLE categories (
   id BIGINT NOT NULL AUTO_INCREMENT,
+  code VARCHAR(30) NOT NULL,
   name VARCHAR(80) NOT NULL,
   description VARCHAR(500) NULL,
   icon_url VARCHAR(1000) NULL,
@@ -73,6 +74,7 @@ CREATE TABLE categories (
   created_at DATETIME NOT NULL,
   updated_at DATETIME NOT NULL,
   PRIMARY KEY (id),
+  UNIQUE KEY uk_categories_code (code),
   UNIQUE KEY uk_categories_name (name)
 );
 
@@ -316,7 +318,7 @@ CREATE TABLE ranking_snapshots (
   id BIGINT NOT NULL AUTO_INCREMENT,
   ranking_date DATE NOT NULL,
   ranking_type ENUM('STREAK','COMPLETED_PUZZLES','PUZZLE_PIECES') NOT NULL,
-  period_type ENUM('DAILY','WEEKLY','MONTHLY','ALL') NOT NULL DEFAULT 'ALL',
+  period_type ENUM('WEEKLY','MONTHLY','YEARLY') NOT NULL DEFAULT 'WEEKLY',
   scope ENUM('OVERALL','CATEGORY') NOT NULL,
   category_id BIGINT NULL,
   user_id BIGINT NOT NULL,

@@ -18,5 +18,11 @@ public record ScheduleCreateRequest(
         LocalDate startDate,
 
         @NotNull
-        LocalDate endDate
-) {}
+        LocalDate endDate,
+
+        Long categoryId
+) {
+    public ScheduleCreateRequest(String title, String description, LocalDate startDate, LocalDate endDate) {
+        this(title, description, startDate, endDate, null);
+    }
+}

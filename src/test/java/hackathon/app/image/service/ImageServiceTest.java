@@ -106,4 +106,31 @@ class ImageServiceTest {
             .isEqualTo(ErrorCode.IMAGE_ACCESS_DENIED);
         verifyNoInteractions(storage);
     }
+
+    @Test
+    void getRandomByCategoryNameReturnsFreshSignedUrl() {
+        Instant expiration = Instant.now().plusSeconds(600);
+        when(images.findRandomActiveByCategoryCode("EXERCISE")).thenReturn(Optional.of(image));
+        when(image.getStorageKey()).thenReturn(STORAGE_KEY);
+        when(storage.signedGetUrl(STORAGE_KEY))
+            .thenReturn(new ObjectStorage.SignedUrl("https://s3.example/random", expiration));
+
+        ImageService.ImageResult result = service.getRandomByCategoryName("운동");
+
+        assertThat(result.image()).isSameAs(image);
+        assertThat(result.url()).isEqualTo("https://s3.example/random");
+        assertThat(result.expiresAt()).isEqualTo(expiration);
+    }
+
+    @Test
+    void getRandomByCategoryNameThrowsWhenImagePoolIsEmpty() {
+        when(images.findRandomActiveByCategoryCode("EXERCISE")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getRandomByCategoryName("운동"))
+            .isInstanceOf(ApiException.class)
+            .extracting(exception -> ((ApiException) exception).errorCode())
+            .isEqualTo(ErrorCode.IMAGE_NOT_FOUND_IN_CATEGORY);
+        verifyNoInteractions(storage);
+    }
+
 }
