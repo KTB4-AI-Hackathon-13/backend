@@ -1,6 +1,7 @@
 package hackathon.app.auth.application;
 
 import java.util.Objects;
+import java.util.Optional;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -61,6 +62,13 @@ public class AuthService {
         AuthSession session = sessions.findById(sessionId).filter(AuthSession::isUsable)
             .orElseThrow(() -> new ApiException(ErrorCode.AUTHENTICATION_REQUIRED));
         return users.findById(session.getUserId()).orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
+    }
+    @Transactional(readOnly = true)
+    public Optional<User> findUser(String sessionId) {
+        if (sessionId == null) return Optional.empty();
+        return sessions.findById(sessionId)
+            .filter(AuthSession::isUsable)
+            .flatMap(session -> users.findById(session.getUserId()));
     }
     public void revokeAllSessions(Long userId) { sessions.findAllByUserId(userId).forEach(AuthSession::revoke); }
     public PasswordEncoder passwordEncoder() { return encoder; }
