@@ -61,6 +61,9 @@ public class ScheduleItem extends BaseTimeEntity {
     @Column(name = "workload", nullable = false)
     private int workload;
 
+    @Column(name = "estimated_minutes")
+    private Integer estimatedMinutes;
+
     /** 1 highest, 5 lowest */
     @Column(name = "priority", nullable = false, columnDefinition = "tinyint")
     private int priority;
@@ -136,6 +139,19 @@ public class ScheduleItem extends BaseTimeEntity {
         if (position != null) {
             this.position = position;
         }
+    }
+
+    /** AI 계획 확정 결과를 적용한다. null 값은 기존 값을 유지한다. */
+    public void applyAiPlan(String title, String description, LocalDate scheduledDate, Integer estimatedMinutes) {
+        if (title != null) this.title = title;
+        if (description != null) this.description = description;
+        if (scheduledDate != null) this.scheduledDate = scheduledDate;
+        if (estimatedMinutes != null) this.estimatedMinutes = estimatedMinutes;
+        this.source = ChangeSource.AI;
+    }
+
+    public void setEstimatedMinutes(Integer estimatedMinutes) {
+        this.estimatedMinutes = estimatedMinutes;
     }
 
     /**

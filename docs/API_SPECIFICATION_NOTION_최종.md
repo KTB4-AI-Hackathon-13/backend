@@ -129,29 +129,22 @@
 
 # 4. AI 계획 생성·수정 API
 
+BE가 외부 AI 서버에 요청하고 응답을 기다린 뒤, 검증과 저장을 완료한 스케줄을 반환한다. 별도의 생성 상태 조회나 AI → BE 콜백 API는 사용하지 않는다.
+
 | 기능 | Method | URL | 인증 | 주요 요청값 | 주요 응답값 | 연결 테이블 |
 |---|---|---|---:|---|---|---|
-| AI 계획 생성 | POST | `/schedules/ai-generations` | O | `conversationId`, `title`, `categoryId?` | `generationId`, `status=PENDING` | ERD 추가 필요 |
-| 생성 상태 조회 | GET | `/schedules/ai-generations/{generationId}` | O | 없음 | `status`, `scheduleId?`, `failureReason?` | ERD 추가 필요 |
-| AI 계획 수정 | POST | `/schedules/{scheduleId}/ai-revisions` | O | `instruction`, `conversationId` | `generationId`, `status=PENDING` | 생성 작업, 변경 이력 |
+| ✅ AI 계획 생성 | POST | `/schedules/ai-generations` | O | `conversationId`, `title`, `categoryId` | 저장 완료된 스케줄 상세(200) | `schedules`, `schedule_items` |
+| ✅ AI 계획 수정 | POST | `/schedules/{scheduleId}/ai-revisions` | O | `instruction`, `conversationId` | 수정 완료된 스케줄 상세(200) | 생성 작업, 변경 이력 |
 
-### AI 생성 상태
-
-| 상태 | 의미 |
-|---|---|
-| `PENDING` | 생성 대기 |
-| `RUNNING` | AI 생성 중 |
-| `SUCCEEDED` | 생성 성공 |
-| `FAILED` | 생성 실패 |
+AI 응답의 `estimated_min`은 `schedule_items.estimated_minutes`, `summary`는 `schedules.description`에 저장한다. 외부 AI 설정은 `AI_BASE_URL`, `AI_CONNECT_TIMEOUT_SECONDS`, `AI_READ_TIMEOUT_SECONDS`를 사용한다.
 
 ### AI 계획 오류
 
 | 오류 코드 | HTTP | 조건 |
 |---|---:|---|
 | `PLAN_INFORMATION_INCOMPLETE` | 422 | 계획 생성 정보 부족 |
-| `GENERATION_NOT_FOUND` | 404 | 생성 작업 없음 |
-| `GENERATION_ALREADY_RUNNING` | 409 | 동일 요청 처리 중 |
-| `AI_GENERATION_FAILED` | 503 | AI 계획 생성 실패 |
+| `AI_RATE_LIMITED` | 429 | 외부 AI 호출 한도 초과 |
+| `AI_PROVIDER_UNAVAILABLE` | 503 | 외부 AI 연결 실패, 제한 시간 초과 또는 오류 응답 |
 
 # 5. 스케줄 API
 
@@ -403,7 +396,7 @@ WHERE schedule_id = :schedule_id
 |---|---|
 | MVP-1 | 회원가입, 로그인, 로그아웃 |
 | MVP-2 | AI 대화 저장·조회 |
-| MVP-3 | AI 계획 생성과 생성 상태 조회 |
+| MVP-3 | 동기식 AI 계획 생성 |
 | MVP-4 | 스케줄·작업 CRUD |
 | MVP-5 | 캘린더와 오늘 할 일 |
 | MVP-6 | 작업 완료와 퍼즐 조각 지급 |

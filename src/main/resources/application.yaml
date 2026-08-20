@@ -24,6 +24,11 @@ spring:
       max-request-size: 11MB
 
 app:
+  ai:
+    # BE가 외부 AI 서버에 동기 요청할 때 사용하는 주소와 타임아웃
+    base-url: ${AI_BASE_URL:}
+    connect-timeout-seconds: ${AI_CONNECT_TIMEOUT_SECONDS:5}
+    read-timeout-seconds: ${AI_READ_TIMEOUT_SECONDS:60}
   cors:
     # 프론트 개발 서버 origin (쉼표 구분). 배포 시 환경변수 APP_CORS_ALLOWED_ORIGINS 로 덮어쓰기
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
