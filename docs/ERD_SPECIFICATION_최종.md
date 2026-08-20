@@ -182,7 +182,8 @@ WHERE schedule_id = :schedule_id
 | 컬럼 | 타입 | 필수 | 기본값 | 역할 |
 |---|---|---:|---:|---|
 | `id` | BIGINT | Y | - | 작업 고유 ID, PK |
-| `schedule_id` | BIGINT | Y | - | 소속 스케줄, `schedules.id` FK |
+| `schedule_id` | BIGINT | N | - | 소속 스케줄, `schedules.id` FK. 단독 작업은 `NULL` |
+| `user_id` | BIGINT | Y | - | 작업 소유 사용자, `users.id` FK. 단독 작업 권한·조회 기준 |
 | `category_id` | BIGINT | N | `NULL` | 작업 카테고리, `categories.id` FK |
 | `parent_item_id` | BIGINT | N | `NULL` | 상위 작업, 자기 자신 테이블의 `id` FK |
 | `title` | VARCHAR(200) | Y | - | 작업 제목 |
@@ -235,7 +236,7 @@ AI나 사용자가 스케줄을 바꿨을 때 변경 전·후 상태를 보존�
 | 컬럼 | 타입 | 필수 | 역할 |
 |---|---|---:|---|
 | `id` | BIGINT | Y | 변경 이력 ID, PK |
-| `schedule_id` | BIGINT | Y | 변경된 스케줄, `schedules.id` FK |
+| `schedule_id` | BIGINT | N | 변경된 스케줄, `schedules.id` FK. 단독 작업 변경은 `NULL` |
 | `schedule_item_id` | BIGINT | N | 특정 작업 변경이라면 해당 `schedule_items.id` |
 | `actor_user_id` | BIGINT | N | 직접 변경한 회원. 자동 배치 변경이면 `NULL` 가능 |
 | `action` | ENUM | Y | 변경 종류 |

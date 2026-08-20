@@ -16,7 +16,7 @@ public record ScheduleItemResponse(
         String description,
         LocalDate scheduledDate,
         int position,
-        int workload,
+        Integer workload,
         Integer estimatedMinutes,
         int priority,
         ScheduleItemStatus status,
@@ -34,7 +34,7 @@ public record ScheduleItemResponse(
     public static ScheduleItemResponse from(ScheduleItem item) {
         return new ScheduleItemResponse(
                 item.getId(),
-                item.getSchedule().getId(),
+                item.getSchedule() == null ? null : item.getSchedule().getId(),
                 item.getCategoryId(),
                 item.getParentItemId(),
                 item.getTitle(),

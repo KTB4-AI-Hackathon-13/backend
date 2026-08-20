@@ -75,12 +75,12 @@ public class ConfirmedPlanPersistenceService {
                     .title(task.title())
                     .description(task.description())
                     .scheduledDate(task.scheduled_date())
-                    .workload(1)
+                    .workload(null)
+                    .estimatedMinutes(task.estimated_min())
                     .priority(3)
                     .position(itemRepository.nextPosition(schedule.getId(), task.scheduled_date()))
                     .source(ChangeSource.AI)
                     .build();
-            item.setEstimatedMinutes(task.estimated_min());
             itemRepository.save(item);
             schedule.increaseVersion();
             changeLogger.log(schedule.getId(), item.getId(), userId, ChangeAction.CREATE, ChangeSource.AI,
@@ -100,7 +100,8 @@ public class ConfirmedPlanPersistenceService {
         for (DailyTask task : plan.daily_tasks()) {
             if (task == null || task.scheduled_date() == null || task.title() == null || task.title().isBlank()
                     || task.title().length() > 200
-                    || (task.estimated_min() != null && task.estimated_min() < 1)) {
+                    || task.estimated_min() == null
+                    || task.estimated_min() < 1) {
                 throw new ApiException(ErrorCode.PLAN_INFORMATION_INCOMPLETE);
             }
         }

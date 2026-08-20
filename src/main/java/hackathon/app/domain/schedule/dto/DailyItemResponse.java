@@ -13,7 +13,8 @@ public record DailyItemResponse(
         Long categoryId,
         String title,
         int position,
-        int workload,
+        Integer workload,
+        Integer estimatedMinutes,
         int priority,
         ScheduleItemStatus status,
         OffsetDateTime completedAt
@@ -21,12 +22,13 @@ public record DailyItemResponse(
     public static DailyItemResponse from(ScheduleItem item) {
         return new DailyItemResponse(
                 item.getId(),
-                item.getSchedule().getId(),
-                item.getSchedule().getTitle(),
+                item.getSchedule() == null ? null : item.getSchedule().getId(),
+                item.getSchedule() == null ? null : item.getSchedule().getTitle(),
                 item.getCategoryId(),
                 item.getTitle(),
                 item.getPosition(),
                 item.getWorkload(),
+                item.getEstimatedMinutes(),
                 item.getPriority(),
                 item.getStatus(),
                 TimeUtils.toOffset(item.getCompletedAt())

@@ -41,6 +41,7 @@ public class PuzzlePieceAwardService implements PuzzlePieceAwarder {
     @Transactional
     public AwardResult awardOnComplete(ScheduleItem item) {
         Schedule schedule = item.getSchedule();
+        if (schedule == null) return AwardResult.none();
         LocalDateTime now = LocalDateTime.now(clock).truncatedTo(ChronoUnit.SECONDS);
 
         Puzzle puzzle = puzzleRepository.findByScheduleId(schedule.getId())

@@ -56,6 +56,7 @@
 
 | 기능 | Method | URL | 인증 | 주요 요청값 | 주요 응답값 | 연결 테이블 |
 |---|---|---|---:|---|---|---|
+| ✅ 계획 없이 작업 추가 | POST | `/schedule-items` | O | `title`, `scheduledDate`, `estimatedMinutes`, `description?`, `categoryId?`, `workload?`, `priority?` | `scheduleId=null`인 단독 작업 | `schedule_items`, 변경 이력 |
 | ✅ 사용자 스케줄 생성 | POST | `/schedules` | O | `title`, `description?`, `startDate`, `endDate` | 생성 스케줄, 퍼즐 수 0 | `schedules`, `schedule_change_logs` |
 | 회원가입 | POST | `/auth/signup` | X | `email`, `password`, `passwordConfirmation`, `nickname`, `termsAgreed`, `privacyAgreed` | `userId`, `email`, `nickname` | `users`, `user_auth_accounts` |
 | 로그인 | POST | `/auth/login` | X | `email`, `password` | 사용자 요약, 세션 쿠키 | `users`, `auth_sessions` |
@@ -192,7 +193,7 @@ WHERE schedule_id = :schedule_id
 
 | 기능 | Method | URL | 인증 | 주요 요청값 | 주요 응답값 | 연결 테이블 |
 |---|---|---|---:|---|---|---|
-| ✅ 작업 추가 | POST | `/schedules/{scheduleId}/items` | O | `title`, `scheduledDate`, `description?`, `categoryId?`, `workload?`, `priority?`, `position?` 🆕 | 생성된 작업 | `schedule_items` |
+| ✅ 작업 추가 | POST | `/schedules/{scheduleId}/items` | O | `title`, `scheduledDate`, `estimatedMinutes`, `description?`, `categoryId?`, `workload?`, `priority?`, `position?` | 생성된 작업 | `schedule_items` |
 | ✅ 작업 수정 | PATCH | `/schedule-items/{itemId}` | O | 변경할 작업 필드 | 수정된 작업 | `schedule_items`, `schedule_change_logs` |
 | ✅ 작업 상태 변경 | PATCH | `/schedule-items/{itemId}/status` | O | `status` | 완료 시 퍼즐 조각 지급 결과 | `schedule_items`, 퍼즐 조각 테이블 필요 |
 | ✅ 작업 삭제 | DELETE | `/schedule-items/{itemId}` | O | 없음 | 204 | `schedule_items` |

@@ -38,8 +38,12 @@ public class ScheduleItem extends BaseTimeEntity {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "schedule_id", nullable = false)
+    @JoinColumn(name = "schedule_id")
     private Schedule schedule;
+
+    /** 단독 작업도 소유자를 식별할 수 있도록 항상 저장한다. */
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
 
     /** categories.id (FK). 카테고리 엔티티와의 연관은 해당 도메인 확정 후 추가 */
     @Column(name = "category_id")
@@ -58,10 +62,10 @@ public class ScheduleItem extends BaseTimeEntity {
     @Column(name = "scheduled_date", nullable = false)
     private LocalDate scheduledDate;
 
-    @Column(name = "workload", nullable = false)
-    private int workload;
+    @Column(name = "workload")
+    private Integer workload;
 
-    @Column(name = "estimated_minutes")
+    @Column(name = "estimated_minutes", nullable = false)
     private Integer estimatedMinutes;
 
     /** 1 highest, 5 lowest */
@@ -87,16 +91,19 @@ public class ScheduleItem extends BaseTimeEntity {
     private LocalDateTime deletedAt;
 
     @Builder
-    private ScheduleItem(Schedule schedule, Long categoryId, Long parentItemId, String title, String description,
-                         LocalDate scheduledDate, Integer workload, Integer priority, Integer position,
+    private ScheduleItem(Schedule schedule, Long userId, Long categoryId, Long parentItemId, String title, String description,
+                         LocalDate scheduledDate, Integer workload, Integer estimatedMinutes,
+                         Integer priority, Integer position,
                          ChangeSource source) {
         this.schedule = schedule;
+        this.userId = userId != null ? userId : schedule.getUserId();
         this.categoryId = categoryId;
         this.parentItemId = parentItemId;
         this.title = title;
         this.description = description;
         this.scheduledDate = scheduledDate;
-        this.workload = workload != null ? workload : 1;
+        this.workload = workload;
+        this.estimatedMinutes = estimatedMinutes;
         this.priority = priority != null ? priority : 3;
         this.position = position != null ? position : 0;
         this.status = ScheduleItemStatus.TODO;
@@ -117,7 +124,7 @@ public class ScheduleItem extends BaseTimeEntity {
 
     /** 작업 내용 수정. null 인 값은 변경하지 않는다. (상태는 changeStatus 로만 변경) */
     public void update(String title, String description, LocalDate scheduledDate, Long categoryId,
-                       Integer workload, Integer priority, Integer position) {
+                       Integer workload, Integer estimatedMinutes, Integer priority, Integer position) {
         if (title != null) {
             this.title = title;
         }
@@ -133,6 +140,9 @@ public class ScheduleItem extends BaseTimeEntity {
         if (workload != null) {
             this.workload = workload;
         }
+        if (estimatedMinutes != null) {
+            this.estimatedMinutes = estimatedMinutes;
+        }
         if (priority != null) {
             this.priority = priority;
         }
@@ -140,6 +150,8 @@ public class ScheduleItem extends BaseTimeEntity {
             this.position = position;
         }
     }
+
+    public boolean belongsToSchedule() { return schedule != null; }
 
     /** AI 계획 확정 결과를 적용한다. null 값은 기존 값을 유지한다. */
     public void applyAiPlan(String title, String description, LocalDate scheduledDate, Integer estimatedMinutes) {
